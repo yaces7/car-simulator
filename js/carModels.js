@@ -16,8 +16,8 @@ const CAR_MODELS = [
             braking: 0.7
         },
         color: 0x3498db,
-        // GLB model yolu (varsa)
-        modelUrl: 'models/sedan.glb' // null ise prosedürel model kullanılır
+        // GLB model yolu (varsa) - şimdilik null (prosedürel model kullan)
+        modelUrl: null
     },
     {
         id: 1,
@@ -31,7 +31,7 @@ const CAR_MODELS = [
             braking: 0.8
         },
         color: 0x2ecc71,
-        modelUrl: 'models/suv.glb'
+        modelUrl: null
     },
     {
         id: 2,
@@ -45,7 +45,7 @@ const CAR_MODELS = [
             braking: 0.9
         },
         color: 0xe74c3c,
-        modelUrl: 'models/sports.glb'
+        modelUrl: null
     },
     {
         id: 3,
@@ -59,7 +59,7 @@ const CAR_MODELS = [
             braking: 0.7
         },
         color: 0xf39c12,
-        modelUrl: 'models/muscle.glb'
+        modelUrl: null
     },
     {
         id: 4,
@@ -73,7 +73,7 @@ const CAR_MODELS = [
             braking: 1.0
         },
         color: 0x9b59b6,
-        modelUrl: 'models/supercar.glb'
+        modelUrl: null
     }
 ];
 

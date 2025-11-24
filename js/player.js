@@ -309,8 +309,7 @@ class Player {
         this.physicsWorld.removeBody(this.body);
         this.driftParticles.forEach(p => this.scene.remove(p.mesh));
     }
-}
-
+    
     update(delta) {
         if (!this.body || !this.mesh) return;
         
