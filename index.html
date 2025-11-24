@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Multiplayer Araba Sürme Oyunu</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Ana Menü -->
+    <div id="mainMenu" class="menu-screen active">
+        <div class="menu-container">
+            <h1 class="game-title">🏎️ RACING WORLD</h1>
+            <div class="menu-buttons">
+                <button class="menu-btn" onclick="showScreen('singlePlayer')">🎮 Tek Oyunculu</button>
+                <button class="menu-btn" onclick="showScreen('multiplayer')">👥 Çok Oyunculu</button>
+                <button class="menu-btn" onclick="showScreen('garage')">🚗 Garaj</button>
+                <button class="menu-btn" onclick="showScreen('settings')">⚙️ Ayarlar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multiplayer Giriş -->
+    <div id="multiplayer" class="menu-screen">
+        <div class="menu-container">
+            <h2>Çok Oyunculu Mod</h2>
+            <input type="text" id="playerName" placeholder="İsminizi girin" maxlength="20" value="Oyuncu">
+            <input type="text" id="serverUrl" placeholder="Sunucu URL" value="ws://localhost:8080">
+            <button class="menu-btn" onclick="startMultiplayer()">🚀 Lobiye Katıl</button>
+            <button class="menu-btn secondary" onclick="showScreen('mainMenu')">⬅️ Geri</button>
+        </div>
+    </div>
+
+    <!-- Tek Oyunculu -->
+    <div id="singlePlayer" class="menu-screen">
+        <div class="menu-container">
+            <h2>Tek Oyunculu Mod</h2>
+            <button class="menu-btn" onclick="startSinglePlayer()">🎮 Başla</button>
+            <button class="menu-btn secondary" onclick="showScreen('mainMenu')">⬅️ Geri</button>
+        </div>
+    </div>
+
+    <!-- Garaj -->
+    <div id="garage" class="menu-screen">
+        <div class="menu-container">
+            <h2>Garaj - Araç Seçimi</h2>
+            <div id="carPreview" class="car-preview"></div>
+            <div class="car-stats" id="carStats"></div>
+            <div class="car-selector">
+                <button class="car-btn" onclick="selectCar(0)">Sedan</button>
+                <button class="car-btn" onclick="selectCar(1)">SUV</button>
+                <button class="car-btn" onclick="selectCar(2)">Sports</button>
+                <button class="car-btn" onclick="selectCar(3)">Muscle</button>
+                <button class="car-btn" onclick="selectCar(4)">Supercar</button>
+            </div>
+            <button class="menu-btn secondary" onclick="showScreen('mainMenu')">⬅️ Geri</button>
+        </div>
+    </div>
+
+    <!-- Ayarlar -->
+    <div id="settings" class="menu-screen">
+        <div class="menu-container">
+            <h2>Ayarlar</h2>
+            <div class="settings-group">
+                <label>Grafik Kalitesi:</label>
+                <select id="graphicsQuality" onchange="updateSettings()">
+                    <option value="low">Düşük</option>
+                    <option value="medium" selected>Orta</option>
+                    <option value="high">Yüksek</option>
+                </select>
+            </div>
+            <div class="settings-group">
+                <label>Gölgeler:</label>
+                <input type="checkbox" id="shadowsEnabled" checked onchange="updateSettings()">
+            </div>
+            <div class="settings-group">
+                <label>Çözünürlük Ölçeği:</label>
+                <input type="range" id="resolutionScale" min="0.5" max="1.5" step="0.1" value="1" onchange="updateSettings()">
+                <span id="resScaleValue">100%</span>
+            </div>
+            <div class="settings-group">
+                <label>Ses Seviyesi:</label>
+                <input type="range" id="volume" min="0" max="100" value="70">
+            </div>
+            <button class="menu-btn secondary" onclick="showScreen('mainMenu')">⬅️ Geri</button>
+        </div>
+    </div>
+
+    <!-- Oyun Ekranı -->
+    <div id="gameScreen" class="game-screen">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- HUD -->
+        <div id="hud" class="hud">
+            <div class="speedometer">
+                <div class="speed-value" id="speedValue">0</div>
+                <div class="speed-unit">KM/H</div>
+            </div>
+            
+            <div class="nitro-bar">
+                <div class="nitro-label">NITRO</div>
+                <div class="nitro-fill" id="nitroFill"></div>
+            </div>
+            
+            <div class="minimap" id="minimap">
+                <canvas id="minimapCanvas" width="200" height="200"></canvas>
+            </div>
+            
+            <div class="player-list" id="playerList">
+                <h3>Oyuncular</h3>
+                <div id="playerListContent"></div>
+            </div>
+            
+            <div class="weather-info" id="weatherInfo">☀️ Güneşli</div>
+            <div class="time-info" id="timeInfo">12:00</div>
+            
+            <button class="pause-btn" onclick="pauseGame()">⏸️</button>
+        </div>
+        
+        <!-- Mobil Kontroller -->
+        <div id="mobileControls" class="mobile-controls">
+            <div class="joystick-container left-joystick">
+                <div class="joystick-base">
+                    <div class="joystick-stick" id="leftStick"></div>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="action-btn brake-btn" id="brakeBtn">
+                    <span>🅱️</span>
+                    <small>Fren</small>
+                </button>
+                <button class="action-btn nitro-btn" id="nitroBtn">
+                    <span>🚀</span>
+                    <small>Nitro</small>
+                </button>
+            </div>
+            
+            <div class="throttle-container">
+                <button class="throttle-btn forward-btn" id="forwardBtn">
+                    <span>⬆️</span>
+                </button>
+                <button class="throttle-btn reverse-btn" id="reverseBtn">
+                    <span>⬇️</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Yükleme Ekranı -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <h2>Yükleniyor...</h2>
+            <div class="loading-bar">
+                <div class="loading-progress" id="loadingProgress"></div>
+            </div>
+            <p id="loadingText">Oyun başlatılıyor...</p>
+        </div>
+    </div>
+
+    <!-- Three.js ve Fizik Kütüphaneleri -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cannon@0.6.2/build/cannon.min.js"></script>
+    
+    <!-- Oyun Modülleri -->
+    <script src="js/camera.js"></script>
+    <script src="js/carModels.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/mobileControls.js"></script>
+    <script src="js/multiplayer.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
