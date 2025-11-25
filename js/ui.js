@@ -1,300 +1,454 @@
 /**
  * ui.js
- * Gerçekçi araba gösterge paneli - İbreli hız göstergesi
+ * Gerçekçi araba gösterge paneli - Fotoğraftaki gibi
  */
 
 class UI {
     constructor() {
         this.minimapCanvas = document.getElementById('minimapCanvas');
-        this.speedometerCanvas = null;
         this.maxSpeed = 280;
+        this.maxRPM = 8;
         
-        this.createSpeedometer();
+        this.createDashboard();
     }
     
-    createSpeedometer() {
-        // Eski speedometer'ı kaldır
+    createDashboard() {
+        // Eski elementleri kaldır
         const oldSpeedometer = document.querySelector('.speedometer');
-        if (oldSpeedometer) {
-            oldSpeedometer.remove();
-        }
+        if (oldSpeedometer) oldSpeedometer.remove();
+        const oldNitro = document.querySelector('.nitro-bar');
+        if (oldNitro) oldNitro.remove();
         
-        // Yeni canvas tabanlı speedometer
-        const container = document.createElement('div');
-        container.id = 'speedometerContainer';
-        container.innerHTML = `
-            <canvas id="speedometerCanvas" width="220" height="140"></canvas>
-            <div id="digitalSpeed">0</div>
-            <div id="gearIndicator">1</div>
-            <div id="fuelGauge">
-                <div id="fuelLabel">FUEL</div>
-                <div id="fuelBar"><div id="fuelFill"></div></div>
+        // Ana dashboard container
+        const dashboard = document.createElement('div');
+        dashboard.id = 'dashboard';
+        dashboard.innerHTML = `
+            <div class="gauge-cluster">
+                <!-- RPM Göstergesi (Sol) -->
+                <div class="gauge rpm-gauge">
+                    <canvas id="rpmCanvas" width="200" height="200"></canvas>
+                    <div class="gauge-center">
+                        <div class="gear-display" id="gearDisplay">1</div>
+                        <div class="odometer" id="odometer">0</div>
+                    </div>
+                </div>
+                
+                <!-- Hız Göstergesi (Sağ) -->
+                <div class="gauge speed-gauge">
+                    <canvas id="speedCanvas" width="200" height="200"></canvas>
+                    <div class="gauge-center">
+                        <div class="speed-digital" id="speedDigital">0</div>
+                        <div class="speed-unit">km/h</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Alt göstergeler -->
+            <div class="sub-gauges">
+                <!-- Yakıt (Sol alt) -->
+                <div class="mini-gauge fuel-gauge">
+                    <canvas id="fuelCanvas" width="80" height="50"></canvas>
+                    <div class="mini-label">⛽</div>
+                </div>
+                
+                <!-- Sıcaklık (Sağ alt) -->
+                <div class="mini-gauge temp-gauge">
+                    <canvas id="tempCanvas" width="80" height="50"></canvas>
+                    <div class="mini-label">🌡️</div>
+                </div>
             </div>
         `;
-        document.getElementById('hud').appendChild(container);
+        document.getElementById('hud').appendChild(dashboard);
         
-        this.speedometerCanvas = document.getElementById('speedometerCanvas');
-        this.digitalSpeed = document.getElementById('digitalSpeed');
-        this.gearIndicator = document.getElementById('gearIndicator');
-        this.fuelFill = document.getElementById('fuelFill');
+        this.rpmCanvas = document.getElementById('rpmCanvas');
+        this.speedCanvas = document.getElementById('speedCanvas');
+        this.fuelCanvas = document.getElementById('fuelCanvas');
+        this.gearDisplay = document.getElementById('gearDisplay');
+        this.speedDigital = document.getElementById('speedDigital');
         
-        this.addSpeedometerStyles();
-        this.drawSpeedometerBase();
+        this.addDashboardStyles();
+        this.drawRPMGauge(1000);
+        this.drawSpeedGauge(0);
+        this.drawFuelGauge(100);
     }
     
-    addSpeedometerStyles() {
+    addDashboardStyles() {
         const style = document.createElement('style');
         style.textContent = `
-            #speedometerContainer {
+            #dashboard {
                 position: fixed;
-                bottom: 20px;
-                right: 20px;
-                width: 220px;
-                height: 180px;
+                bottom: 10px;
+                right: 10px;
                 z-index: 100;
             }
-            #speedometerCanvas {
-                position: absolute;
-                bottom: 40px;
-                right: 0;
+            .gauge-cluster {
+                display: flex;
+                gap: 5px;
             }
-            #digitalSpeed {
+            .gauge {
+                position: relative;
+                width: 200px;
+                height: 200px;
+            }
+            .gauge canvas {
                 position: absolute;
-                bottom: 55px;
-                right: 85px;
-                font-size: 32px;
+                top: 0;
+                left: 0;
+            }
+            .gauge-center {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                text-align: center;
+                margin-top: 20px;
+            }
+            .gear-display {
+                font-size: 42px;
                 font-weight: bold;
                 color: #00ff88;
-                font-family: 'Courier New', monospace;
-                text-shadow: 0 0 10px #00ff88;
-            }
-            #gearIndicator {
-                position: absolute;
-                bottom: 25px;
-                right: 95px;
-                font-size: 28px;
-                font-weight: bold;
-                color: #ff6b6b;
                 font-family: 'Arial Black', sans-serif;
-                text-shadow: 0 0 8px #ff6b6b;
+                text-shadow: 0 0 15px #00ff88;
             }
-            #fuelGauge {
-                position: absolute;
-                bottom: 5px;
-                right: 20px;
-                width: 180px;
+            .odometer {
+                font-size: 14px;
+                color: #4af;
+                font-family: 'Courier New', monospace;
+                background: rgba(0,50,100,0.8);
+                padding: 3px 10px;
+                border-radius: 3px;
+                margin-top: 5px;
             }
-            #fuelLabel {
-                color: #ffd700;
-                font-size: 10px;
+            .speed-digital {
+                font-size: 36px;
                 font-weight: bold;
-                margin-bottom: 2px;
+                color: #fff;
+                font-family: 'Arial Black', sans-serif;
             }
-            #fuelBar {
-                width: 100%;
-                height: 12px;
-                background: rgba(0,0,0,0.7);
-                border-radius: 6px;
-                border: 2px solid #444;
-                overflow: hidden;
+            .speed-unit {
+                font-size: 12px;
+                color: #888;
             }
-            #fuelFill {
-                height: 100%;
-                width: 100%;
-                background: linear-gradient(90deg, #ff4444 0%, #ffaa00 30%, #00ff88 60%, #00ff88 100%);
-                transition: width 0.3s;
-                border-radius: 4px;
+            .sub-gauges {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 5px;
+                padding: 0 30px;
             }
-            /* Eski speedometer'ı gizle */
-            .speedometer { display: none !important; }
-            .nitro-bar { display: none !important; }
+            .mini-gauge {
+                position: relative;
+                width: 80px;
+                height: 50px;
+            }
+            .mini-label {
+                position: absolute;
+                bottom: -5px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 16px;
+            }
+            /* Eski elementleri gizle */
+            .speedometer, .nitro-bar { display: none !important; }
         `;
         document.head.appendChild(style);
     }
     
-    drawSpeedometerBase() {
-        if (!this.speedometerCanvas) return;
+    drawRPMGauge(rpm) {
+        if (!this.rpmCanvas) return;
         
-        const ctx = this.speedometerCanvas.getContext('2d');
-        const w = this.speedometerCanvas.width;
-        const h = this.speedometerCanvas.height;
-        const centerX = w / 2;
-        const centerY = h - 10;
-        const radius = 95;
+        const ctx = this.rpmCanvas.getContext('2d');
+        const w = this.rpmCanvas.width;
+        const h = this.rpmCanvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const r = 85;
         
-        // Arka plan
         ctx.clearRect(0, 0, w, h);
         
-        // Dış halka
-        const gradient = ctx.createRadialGradient(centerX, centerY, radius - 20, centerX, centerY, radius + 5);
-        gradient.addColorStop(0, 'rgba(20, 25, 35, 0.95)');
-        gradient.addColorStop(1, 'rgba(10, 15, 20, 0.98)');
-        
+        // Dış kırmızı halka
         ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
-        ctx.lineTo(centerX + radius, centerY);
-        ctx.arc(centerX, centerY, radius - 25, 0, Math.PI, true);
-        ctx.closePath();
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        
-        // Kenar
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 3;
+        ctx.arc(cx, cy, r + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ff3333';
+        ctx.lineWidth = 4;
         ctx.stroke();
         
-        // Hız işaretleri
-        const startAngle = Math.PI;
-        const endAngle = 0;
-        const speedMarks = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280];
+        // Arka plan
+        const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        bgGrad.addColorStop(0, '#1a1a1a');
+        bgGrad.addColorStop(1, '#0a0a0a');
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = bgGrad;
+        ctx.fill();
         
-        speedMarks.forEach(speed => {
-            const angle = startAngle + (speed / this.maxSpeed) * (endAngle - startAngle);
-            const innerR = radius - 22;
-            const outerR = speed % 40 === 0 ? radius - 8 : radius - 14;
+        // RPM işaretleri (0-8, saat yönünün tersine, soldan başlayıp sağa)
+        const startAngle = Math.PI * 0.75; // Sol alt
+        const endAngle = Math.PI * 2.25; // Sağ alt
+        const totalAngle = endAngle - startAngle;
+        
+        for (let i = 0; i <= 8; i++) {
+            const angle = startAngle + (i / 8) * totalAngle;
+            const innerR = i % 2 === 0 ? r - 20 : r - 12;
+            const outerR = r - 5;
             
-            const x1 = centerX + Math.cos(angle) * innerR;
-            const y1 = centerY + Math.sin(angle) * innerR;
-            const x2 = centerX + Math.cos(angle) * outerR;
-            const y2 = centerY + Math.sin(angle) * outerR;
+            const x1 = cx + Math.cos(angle) * innerR;
+            const y1 = cy + Math.sin(angle) * innerR;
+            const x2 = cx + Math.cos(angle) * outerR;
+            const y2 = cy + Math.sin(angle) * outerR;
             
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
-            ctx.strokeStyle = speed >= 200 ? '#ff4444' : '#888';
-            ctx.lineWidth = speed % 40 === 0 ? 3 : 1;
+            ctx.strokeStyle = i >= 7 ? '#ff4444' : '#888';
+            ctx.lineWidth = i % 2 === 0 ? 3 : 1;
             ctx.stroke();
             
-            // Sayılar (her 40'ta bir)
-            if (speed % 40 === 0) {
-                const textR = radius - 35;
-                const tx = centerX + Math.cos(angle) * textR;
-                const ty = centerY + Math.sin(angle) * textR;
-                
-                ctx.fillStyle = speed >= 200 ? '#ff6666' : '#aaa';
-                ctx.font = 'bold 11px Arial';
+            // Sayılar
+            if (i % 2 === 0 || i === 7) {
+                const textR = r - 32;
+                const tx = cx + Math.cos(angle) * textR;
+                const ty = cy + Math.sin(angle) * textR;
+                ctx.fillStyle = i >= 7 ? '#ff6666' : '#ccc';
+                ctx.font = 'bold 14px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(speed.toString(), tx, ty);
+                ctx.fillText(i.toString(), tx, ty);
             }
-        });
+        }
         
-        // KM/H yazısı
-        ctx.fillStyle = '#666';
+        // x100 r/min yazısı
+        ctx.fillStyle = '#888';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('km/h', centerX, centerY - 25);
-    }
-    
-    updateSpeed(speed) {
-        if (!this.speedometerCanvas) return;
-        
-        const ctx = this.speedometerCanvas.getContext('2d');
-        const w = this.speedometerCanvas.width;
-        const h = this.speedometerCanvas.height;
-        const centerX = w / 2;
-        const centerY = h - 10;
-        const radius = 95;
-        
-        // Tabanı yeniden çiz
-        this.drawSpeedometerBase();
-        
-        // İbre açısı hesapla
-        const clampedSpeed = Math.min(Math.max(speed, 0), this.maxSpeed);
-        const startAngle = Math.PI;
-        const endAngle = 0;
-        const needleAngle = startAngle + (clampedSpeed / this.maxSpeed) * (endAngle - startAngle);
-        
-        // İbre gölgesi
-        ctx.save();
-        ctx.translate(centerX + 2, centerY + 2);
-        ctx.rotate(needleAngle - Math.PI / 2);
-        ctx.beginPath();
-        ctx.moveTo(-3, 10);
-        ctx.lineTo(0, -radius + 35);
-        ctx.lineTo(3, 10);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fill();
-        ctx.restore();
+        ctx.fillText('x100r/min', cx, cy + 35);
         
         // İbre
+        const rpmValue = Math.min(rpm / 1000, 8);
+        const needleAngle = startAngle + (rpmValue / 8) * totalAngle;
+        
         ctx.save();
-        ctx.translate(centerX, centerY);
+        ctx.translate(cx, cy);
         ctx.rotate(needleAngle - Math.PI / 2);
         
-        // İbre gövdesi
-        const needleGradient = ctx.createLinearGradient(0, -radius + 35, 0, 15);
-        needleGradient.addColorStop(0, '#ff3333');
-        needleGradient.addColorStop(0.7, '#ff6666');
-        needleGradient.addColorStop(1, '#aa2222');
-        
+        // İbre gölge
         ctx.beginPath();
-        ctx.moveTo(-2.5, 12);
-        ctx.lineTo(-1, -radius + 38);
-        ctx.lineTo(1, -radius + 38);
-        ctx.lineTo(2.5, 12);
+        ctx.moveTo(-3, 15);
+        ctx.lineTo(0, -r + 25);
+        ctx.lineTo(3, 15);
         ctx.closePath();
-        ctx.fillStyle = needleGradient;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fill();
-        ctx.strokeStyle = '#ff8888';
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
+        
+        // İbre
+        const needleGrad = ctx.createLinearGradient(0, -r + 25, 0, 15);
+        needleGrad.addColorStop(0, '#ff4444');
+        needleGrad.addColorStop(1, '#aa2222');
+        ctx.beginPath();
+        ctx.moveTo(-2, 12);
+        ctx.lineTo(0, -r + 28);
+        ctx.lineTo(2, 12);
+        ctx.closePath();
+        ctx.fillStyle = needleGrad;
+        ctx.fill();
         
         ctx.restore();
         
         // Merkez kapak
-        const capGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 12);
-        capGradient.addColorStop(0, '#555');
-        capGradient.addColorStop(0.5, '#333');
-        capGradient.addColorStop(1, '#222');
-        
+        const capGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 12);
+        capGrad.addColorStop(0, '#444');
+        capGrad.addColorStop(1, '#222');
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
-        ctx.fillStyle = capGradient;
+        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+        ctx.fillStyle = capGrad;
         ctx.fill();
-        ctx.strokeStyle = '#444';
-        ctx.lineWidth = 2;
+    }
+    
+    drawSpeedGauge(speed) {
+        if (!this.speedCanvas) return;
+        
+        const ctx = this.speedCanvas.getContext('2d');
+        const w = this.speedCanvas.width;
+        const h = this.speedCanvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const r = 85;
+        
+        ctx.clearRect(0, 0, w, h);
+        
+        // Dış kırmızı halka
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ff3333';
+        ctx.lineWidth = 4;
         ctx.stroke();
         
+        // Arka plan
+        const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        bgGrad.addColorStop(0, '#1a1a1a');
+        bgGrad.addColorStop(1, '#0a0a0a');
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = bgGrad;
+        ctx.fill();
+        
+        // Hız işaretleri (0-280, saat yönünün tersine)
+        const startAngle = Math.PI * 0.75;
+        const endAngle = Math.PI * 2.25;
+        const totalAngle = endAngle - startAngle;
+        const speedMarks = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280];
+        
+        speedMarks.forEach((mark, i) => {
+            const angle = startAngle + (mark / 280) * totalAngle;
+            const innerR = mark % 40 === 0 ? r - 20 : r - 12;
+            const outerR = r - 5;
+            
+            const x1 = cx + Math.cos(angle) * innerR;
+            const y1 = cy + Math.sin(angle) * innerR;
+            const x2 = cx + Math.cos(angle) * outerR;
+            const y2 = cy + Math.sin(angle) * outerR;
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = mark >= 220 ? '#ff4444' : '#888';
+            ctx.lineWidth = mark % 40 === 0 ? 3 : 1;
+            ctx.stroke();
+            
+            // Sayılar (her 40'ta bir)
+            if (mark % 40 === 0) {
+                const textR = r - 32;
+                const tx = cx + Math.cos(angle) * textR;
+                const ty = cy + Math.sin(angle) * textR;
+                ctx.fillStyle = mark >= 220 ? '#ff6666' : '#ccc';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(mark.toString(), tx, ty);
+            }
+        });
+        
+        // km/h yazısı
+        ctx.fillStyle = '#888';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('km/h', cx, cy + 35);
+        
+        // İbre
+        const clampedSpeed = Math.min(Math.max(speed, 0), 280);
+        const needleAngle = startAngle + (clampedSpeed / 280) * totalAngle;
+        
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(needleAngle - Math.PI / 2);
+        
+        // İbre
+        const needleGrad = ctx.createLinearGradient(0, -r + 25, 0, 15);
+        needleGrad.addColorStop(0, '#ff4444');
+        needleGrad.addColorStop(1, '#aa2222');
+        ctx.beginPath();
+        ctx.moveTo(-2, 12);
+        ctx.lineTo(0, -r + 28);
+        ctx.lineTo(2, 12);
+        ctx.closePath();
+        ctx.fillStyle = needleGrad;
+        ctx.fill();
+        
+        ctx.restore();
+        
+        // Merkez kapak
+        const capGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 12);
+        capGrad.addColorStop(0, '#444');
+        capGrad.addColorStop(1, '#222');
+        ctx.beginPath();
+        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+        ctx.fillStyle = capGrad;
+        ctx.fill();
+        
         // Dijital hız
-        if (this.digitalSpeed) {
-            this.digitalSpeed.textContent = Math.round(speed);
+        if (this.speedDigital) {
+            this.speedDigital.textContent = Math.round(speed);
         }
+    }
+    
+    drawFuelGauge(fuel) {
+        if (!this.fuelCanvas) return;
+        
+        const ctx = this.fuelCanvas.getContext('2d');
+        const w = this.fuelCanvas.width;
+        const h = this.fuelCanvas.height;
+        
+        ctx.clearRect(0, 0, w, h);
+        
+        // Arka plan
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, 0, w, h);
+        
+        // E ve F harfleri
+        ctx.fillStyle = '#ff4444';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('E', 5, h - 8);
+        
+        ctx.fillStyle = '#44ff44';
+        ctx.textAlign = 'right';
+        ctx.fillText('F', w - 5, h - 8);
+        
+        // İşaretler
+        const startX = 15;
+        const endX = w - 15;
+        const markY = 15;
+        
+        for (let i = 0; i <= 4; i++) {
+            const x = startX + (i / 4) * (endX - startX);
+            ctx.beginPath();
+            ctx.moveTo(x, markY);
+            ctx.lineTo(x, markY + 8);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = i % 2 === 0 ? 2 : 1;
+            ctx.stroke();
+        }
+        
+        // İbre (soldan sağa - E'den F'ye)
+        const fuelPercent = Math.max(0, Math.min(100, fuel));
+        const needleX = startX + (fuelPercent / 100) * (endX - startX);
+        
+        ctx.beginPath();
+        ctx.moveTo(needleX, markY + 2);
+        ctx.lineTo(needleX - 4, markY + 15);
+        ctx.lineTo(needleX + 4, markY + 15);
+        ctx.closePath();
+        ctx.fillStyle = fuelPercent < 20 ? '#ff4444' : '#ff8844';
+        ctx.fill();
+    }
+    
+    updateSpeed(speed) {
+        this.drawSpeedGauge(speed);
     }
     
     updateGear(gear) {
-        if (this.gearIndicator) {
+        if (this.gearDisplay) {
             if (gear === 0) {
-                this.gearIndicator.textContent = 'N';
-                this.gearIndicator.style.color = '#ffff00';
+                this.gearDisplay.textContent = 'N';
+                this.gearDisplay.style.color = '#ffff00';
             } else if (gear === -1) {
-                this.gearIndicator.textContent = 'R';
-                this.gearIndicator.style.color = '#ff4444';
+                this.gearDisplay.textContent = 'R';
+                this.gearDisplay.style.color = '#ff4444';
             } else {
-                this.gearIndicator.textContent = gear;
-                this.gearIndicator.style.color = '#00ff88';
-            }
-        }
-    }
-    
-    updateFuel(fuelPercent) {
-        if (this.fuelFill) {
-            this.fuelFill.style.width = `${fuelPercent}%`;
-            
-            // Düşük yakıt uyarısı
-            if (fuelPercent < 20) {
-                this.fuelFill.style.animation = 'fuelBlink 0.5s infinite';
-            } else {
-                this.fuelFill.style.animation = 'none';
+                this.gearDisplay.textContent = gear;
+                this.gearDisplay.style.color = '#00ff88';
             }
         }
     }
     
     updateRPM(rpm, maxRPM = 8000) {
-        // RPM göstergesi için ileride eklenebilir
+        this.drawRPMGauge(rpm);
+    }
+    
+    updateFuel(fuel) {
+        this.drawFuelGauge(fuel);
     }
 
     updateMinimap(playerPosition, playerRotation, mapSize = 500) {
@@ -306,11 +460,9 @@ class UI {
         
         ctx.clearRect(0, 0, w, h);
         
-        // Arka plan
         ctx.fillStyle = 'rgba(20, 25, 30, 0.95)';
         ctx.fillRect(0, 0, w, h);
         
-        // Grid
         ctx.strokeStyle = 'rgba(60, 70, 80, 0.4)';
         ctx.lineWidth = 1;
         for (let i = 0; i <= 4; i++) {
@@ -331,7 +483,6 @@ class UI {
         const offsetX = -playerPosition.x * scale;
         const offsetZ = -playerPosition.z * scale;
         
-        // Yollar
         ctx.strokeStyle = '#555';
         ctx.lineWidth = 10;
         ctx.beginPath();
@@ -343,7 +494,6 @@ class UI {
         ctx.lineTo(w, centerY + offsetZ);
         ctx.stroke();
         
-        // Oyuncu
         ctx.save();
         ctx.translate(centerX, centerY);
         ctx.rotate(-playerRotation);
@@ -362,20 +512,9 @@ class UI {
         
         ctx.restore();
         
-        // Pusula
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 11px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('N', w/2, 12);
     }
 }
-
-// Yakıt uyarı animasyonu
-const fuelBlinkStyle = document.createElement('style');
-fuelBlinkStyle.textContent = `
-    @keyframes fuelBlink {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.3; }
-    }
-`;
-document.head.appendChild(fuelBlinkStyle);

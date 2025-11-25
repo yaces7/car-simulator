@@ -156,14 +156,31 @@ class GameMap {
         const isMainRoadZ = (chunkX === 0);
         const isIntersection = isMainRoadX && isMainRoadZ;
         
-        // Ana yollar
+        // Benzin istasyonu kontrolü için önce random'u çağır
+        let gasStationSideX = null;
+        let gasStationSideZ = null;
+        
+        // Benzin istasyonu olacak mı kontrol et
+        if ((isMainRoadX || isMainRoadZ) && !isIntersection && random() < 0.25) {
+            const side = random() > 0.5 ? 1 : -1;
+            
+            if (isMainRoadX && !isMainRoadZ) {
+                gasStationSideX = side;
+                this.createGasStation(worldX + 50, worldZ + this.chunkSize/2 + side * 18, chunk, false, side);
+            } else if (isMainRoadZ && !isMainRoadX) {
+                gasStationSideZ = side;
+                this.createGasStation(worldX + this.chunkSize/2 + side * 18, worldZ + 50, chunk, true, side);
+            }
+        }
+        
+        // Ana yollar - benzin istasyonu tarafında bariyer yok
         if (isMainRoadX) {
             this.createMainRoad(worldX, worldZ, chunk, false);
-            this.createRoadBarriers(worldX, worldZ, chunk, false);
+            this.createRoadBarriers(worldX, worldZ, chunk, false, gasStationSideX);
         }
         if (isMainRoadZ) {
             this.createMainRoad(worldX, worldZ, chunk, true);
-            this.createRoadBarriers(worldX, worldZ, chunk, true);
+            this.createRoadBarriers(worldX, worldZ, chunk, true, gasStationSideZ);
         }
         
         // Kavşakta trafik ışıkları
@@ -172,20 +189,6 @@ class GameMap {
             this.createTrafficLight(worldX + this.chunkSize/2 - 14, worldZ + this.chunkSize/2 - 14, chunk, -Math.PI * 0.25);
             this.createTrafficLight(worldX + this.chunkSize/2 + 14, worldZ + this.chunkSize/2 - 14, chunk, Math.PI * 0.25);
             this.createTrafficLight(worldX + this.chunkSize/2 - 14, worldZ + this.chunkSize/2 + 14, chunk, -Math.PI * 0.75);
-        }
-        
-        // Benzin istasyonu - yolun YANINDA (dışında)
-        if ((isMainRoadX || isMainRoadZ) && !isIntersection && random() < 0.2) {
-            // Yolun dışına, bariyerin ötesine koy
-            if (isMainRoadX && !isMainRoadZ) {
-                // Yatay yol - üst veya alt tarafa
-                const side = random() > 0.5 ? 1 : -1;
-                this.createGasStation(worldX + 40, worldZ + this.chunkSize/2 + side * 30, chunk, false, side);
-            } else if (isMainRoadZ && !isMainRoadX) {
-                // Dikey yol - sağ veya sol tarafa
-                const side = random() > 0.5 ? 1 : -1;
-                this.createGasStation(worldX + this.chunkSize/2 + side * 30, worldZ + 40, chunk, true, side);
-            }
         }
         
         // Binalar - sadece yoldan uzakta
@@ -217,23 +220,28 @@ class GameMap {
         this.loadedChunks.set(key, chunk);
     }
     
-    createRoadBarriers(worldX, worldZ, chunk, vertical) {
+    createRoadBarriers(worldX, worldZ, chunk, vertical, skipSide = null) {
         // Kavşak chunk'ında bariyer koyma
         const chunkX = Math.floor(worldX / this.chunkSize);
         const chunkZ = Math.floor(worldZ / this.chunkSize);
         const isIntersection = (chunkX === 0 && chunkZ === 0);
         
-        if (isIntersection) return; // Kavşakta bariyer yok
+        if (isIntersection) return;
         
         const barrierMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
         const barrierHeight = 0.7;
         const barrierWidth = 0.25;
-        const roadHalfWidth = 12; // Yol yarı genişliği
-        
-        // Sadece yolun DIŞ kenarlarına bariyer koy
-        const edgeOffset = roadHalfWidth + 1; // Yol kenarı + biraz boşluk
+        const roadHalfWidth = 12;
+        const edgeOffset = roadHalfWidth + 1;
         
         [-edgeOffset, edgeOffset].forEach(offset => {
+            // Benzin istasyonu tarafında bariyer koyma
+            if (skipSide !== null) {
+                if ((skipSide > 0 && offset > 0) || (skipSide < 0 && offset < 0)) {
+                    return; // Bu tarafta bariyer yok
+                }
+            }
+            
             const barrier = new THREE.Mesh(
                 new THREE.BoxGeometry(
                     vertical ? barrierWidth : this.chunkSize,
@@ -252,7 +260,6 @@ class GameMap {
             this.scene.add(barrier);
             chunk.objects.push(barrier);
             
-            // Fizik
             const shape = new CANNON.Box(new CANNON.Vec3(
                 vertical ? barrierWidth/2 : this.chunkSize/2,
                 barrierHeight/2,
@@ -341,28 +348,29 @@ class GameMap {
             group.add(pump);
         });
         
-        // Dönen yeşil simge (yakıt ikonu)
+        // Dönen yeşil simge (yakıt ikonu) - pompaların yanında, alçakta
         const iconGroup = new THREE.Group();
         
         // Dış halka
-        const ringGeom = new THREE.TorusGeometry(1.5, 0.15, 8, 24);
+        const ringGeom = new THREE.TorusGeometry(1.2, 0.12, 8, 24);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         const ring = new THREE.Mesh(ringGeom, ringMat);
         iconGroup.add(ring);
         
         // İç benzin damlası şekli
-        const dropGeom = new THREE.SphereGeometry(0.8, 8, 8);
+        const dropGeom = new THREE.SphereGeometry(0.6, 8, 8);
         const dropMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.8 });
         const drop = new THREE.Mesh(dropGeom, dropMat);
         iconGroup.add(drop);
         
         // Parıltı efekti
-        const glowGeom = new THREE.SphereGeometry(2, 16, 16);
-        const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.2 });
+        const glowGeom = new THREE.SphereGeometry(1.5, 16, 16);
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.15 });
         const glow = new THREE.Mesh(glowGeom, glowMat);
         iconGroup.add(glow);
         
-        iconGroup.position.set(0, 7, 2);
+        // Pompaların önünde, arabanın geçeceği yerde, alçakta
+        iconGroup.position.set(0, 2.5, 6);
         iconGroup.userData.isGasIcon = true;
         group.add(iconGroup);
         
