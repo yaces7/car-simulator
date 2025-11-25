@@ -450,6 +450,48 @@ class UI {
     updateFuel(fuel) {
         this.drawFuelGauge(fuel);
     }
+    
+    updateHealth(health) {
+        // Hasar göstergesi - ekranın sol üstünde
+        let healthBar = document.getElementById('healthBarUI');
+        if (!healthBar) {
+            healthBar = document.createElement('div');
+            healthBar.id = 'healthBarUI';
+            healthBar.innerHTML = `
+                <div class="health-label">❤️ HEALTH</div>
+                <div class="health-bar-bg">
+                    <div class="health-bar-fill" id="healthFill"></div>
+                </div>
+            `;
+            healthBar.style.cssText = `
+                position: fixed;
+                top: 240px;
+                left: 20px;
+                z-index: 100;
+                background: rgba(0,0,0,0.7);
+                padding: 10px 15px;
+                border-radius: 8px;
+                border: 2px solid #ff4444;
+            `;
+            document.body.appendChild(healthBar);
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                .health-label { color: #ff6666; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+                .health-bar-bg { width: 150px; height: 15px; background: #333; border-radius: 8px; overflow: hidden; }
+                .health-bar-fill { height: 100%; background: linear-gradient(90deg, #ff4444, #44ff44); transition: width 0.3s; border-radius: 8px; }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        const fill = document.getElementById('healthFill');
+        if (fill) {
+            fill.style.width = `${health}%`;
+            fill.style.background = health > 50 ? 'linear-gradient(90deg, #44ff44, #88ff88)' : 
+                                    health > 25 ? 'linear-gradient(90deg, #ffaa00, #ffcc00)' : 
+                                    'linear-gradient(90deg, #ff4444, #ff6666)';
+        }
+    }
 
     updateMinimap(playerPosition, playerRotation, mapSize = 500) {
         if (!this.minimapCanvas) return;

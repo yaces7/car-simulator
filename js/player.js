@@ -54,9 +54,20 @@ class Player {
         this.currentTilt = 0;
         
         // Yakıt sistemi
-        this.fuel = 100; // Yüzde olarak
+        this.fuel = 100;
         this.maxFuel = 100;
-        this.fuelConsumption = 0.5; // Saniyede tüketim (gaz basılıyken)
+        this.fuelConsumption = 0.5;
+        
+        // Hasar sistemi
+        this.health = 100;
+        this.maxHealth = 100;
+        this.lastCollisionTime = 0;
+        this.invulnerable = false;
+        
+        // Far sistemi
+        this.headlightsOn = false;
+        this.headlights = [];
+        this.setupHeadlights();
         
         // Vites sistemi
         this.currentGear = 1;
@@ -73,6 +84,76 @@ class Player {
         this.setupDriftParticles();
         
         this.setupControls();
+        this.setupCollisionDetection();
+    }
+    
+    setupHeadlights() {
+        // Sol far
+        const leftLight = new THREE.SpotLight(0xffffcc, 0, 50, Math.PI / 6, 0.5);
+        leftLight.position.set(-0.6, 0.6, 2.5);
+        leftLight.target.position.set(-0.6, 0, 20);
+        this.mesh.add(leftLight);
+        this.mesh.add(leftLight.target);
+        this.headlights.push(leftLight);
+        
+        // Sağ far
+        const rightLight = new THREE.SpotLight(0xffffcc, 0, 50, Math.PI / 6, 0.5);
+        rightLight.position.set(0.6, 0.6, 2.5);
+        rightLight.target.position.set(0.6, 0, 20);
+        this.mesh.add(rightLight);
+        this.mesh.add(rightLight.target);
+        this.headlights.push(rightLight);
+    }
+    
+    toggleHeadlights() {
+        this.headlightsOn = !this.headlightsOn;
+        const intensity = this.headlightsOn ? 2 : 0;
+        this.headlights.forEach(light => {
+            light.intensity = intensity;
+        });
+        return this.headlightsOn;
+    }
+    
+    setupCollisionDetection() {
+        this.body.addEventListener('collide', (event) => {
+            const now = Date.now();
+            if (now - this.lastCollisionTime < 500) return; // 0.5 saniye bekleme
+            
+            const impactVelocity = event.contact.getImpactVelocityAlongNormal();
+            const damage = Math.abs(impactVelocity) * 2;
+            
+            if (damage > 5 && !this.invulnerable) {
+                this.takeDamage(damage);
+                this.lastCollisionTime = now;
+            }
+        });
+    }
+    
+    takeDamage(amount) {
+        this.health -= amount;
+        if (this.health < 0) this.health = 0;
+        
+        // Hasar efekti - kırmızı flash
+        if (this.mesh.children) {
+            this.mesh.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    const originalColor = child.material.color.getHex();
+                    child.material.color.setHex(0xff0000);
+                    setTimeout(() => {
+                        child.material.color.setHex(originalColor);
+                    }, 100);
+                }
+            });
+        }
+        
+        // Ses efekti
+        if (typeof audioManager !== 'undefined' && audioManager) {
+            audioManager.playSound('crash');
+        }
+    }
+    
+    repair(amount) {
+        this.health = Math.min(this.health + amount, this.maxHealth);
     }
     
     setupControls() {

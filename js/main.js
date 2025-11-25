@@ -304,6 +304,7 @@ function animate() {
             ui.updateGear(player.currentGear || 1);
             ui.updateRPM(player.rpm || 1000, 8000);
             ui.updateFuel(player.fuel || 100);
+            ui.updateHealth(player.health || 100);
             ui.updateMinimap(
                 player.mesh.position,
                 player.rotationY || 0
@@ -479,6 +480,15 @@ window.addEventListener('keydown', (e) => {
                 camera.height = 4;
             }
             break;
+        case 'l':
+            // Farları aç/kapa
+            if (player) {
+                const lightsOn = player.toggleHeadlights();
+                if (gameManager) {
+                    gameManager.showNotification(lightsOn ? '💡 Farlar Açık' : '🌑 Farlar Kapalı', '');
+                }
+            }
+            break;
         case 'm':
             // Ses aç/kapa
             if (audioManager) {
@@ -612,20 +622,29 @@ function handleGasStation(station) {
         document.getElementById('currentFuel').textContent = Math.round(player.fuel);
         
         const fuelNeeded = 100 - player.fuel;
-        const price = Math.ceil(fuelNeeded * 0.5);
-        document.getElementById('fuelPrice').textContent = price;
+        const repairNeeded = 100 - (player.health || 100);
+        const fuelPrice = Math.ceil(fuelNeeded * 0.5);
+        const repairPrice = Math.ceil(repairNeeded * 1);
+        const totalPrice = fuelPrice + repairPrice;
+        
+        // Fiyat bilgisini güncelle
+        let priceText = '';
+        if (fuelNeeded > 0) priceText += `⛽ ${fuelPrice} `;
+        if (repairNeeded > 0) priceText += `🔧 ${repairPrice} `;
+        priceText += `= ${totalPrice}`;
+        document.getElementById('fuelPrice').textContent = priceText;
         
         const btn = document.getElementById('refuelBtn');
         const playerMoney = parseInt(localStorage.getItem('playerMoney')) || 1000;
         
-        if (player.fuel >= 99) {
-            btn.textContent = '✅ Depo Dolu';
+        if (player.fuel >= 99 && (player.health || 100) >= 100) {
+            btn.textContent = '✅ Her şey tamam!';
             btn.disabled = true;
-        } else if (playerMoney < price) {
+        } else if (playerMoney < totalPrice) {
             btn.textContent = '❌ Yetersiz Para';
             btn.disabled = true;
         } else {
-            btn.textContent = `🔋 Doldur (${price} 💰)`;
+            btn.textContent = `🔧 Servis Al (${totalPrice} 💰)`;
             btn.disabled = refuelingInProgress;
         }
     } else {
@@ -638,49 +657,64 @@ function handleGasStation(station) {
 }
 
 function startRefueling() {
-    if (!isAtGasStation || refuelingInProgress || player.fuel >= 99) return;
+    if (!isAtGasStation || refuelingInProgress) return;
+    
+    // Yakıt veya tamir
+    const needsFuel = player.fuel < 99;
+    const needsRepair = player.health < 100;
+    
+    if (!needsFuel && !needsRepair) return;
     
     const fuelNeeded = 100 - player.fuel;
-    const price = Math.ceil(fuelNeeded * 0.5);
+    const repairNeeded = 100 - player.health;
+    const fuelPrice = Math.ceil(fuelNeeded * 0.5);
+    const repairPrice = Math.ceil(repairNeeded * 1);
+    const totalPrice = fuelPrice + repairPrice;
+    
     let playerMoney = parseInt(localStorage.getItem('playerMoney')) || 1000;
     
-    if (playerMoney < price) return;
+    if (playerMoney < totalPrice) return;
     
     refuelingInProgress = true;
-    playerMoney -= price;
+    playerMoney -= totalPrice;
     localStorage.setItem('playerMoney', playerMoney);
     
-    // Animasyonlu dolum
+    // Animasyonlu dolum ve tamir
     const progressDiv = document.getElementById('fuelProgress');
     const progressBar = document.getElementById('fuelProgressBar');
     const btn = document.getElementById('refuelBtn');
     
     progressDiv.style.display = 'block';
     btn.disabled = true;
-    btn.textContent = '⏳ Dolduruluyor...';
+    btn.textContent = '⏳ İşlem yapılıyor...';
     
     const startFuel = player.fuel;
-    const targetFuel = 100;
-    const duration = 2000; // 2 saniye
+    const startHealth = player.health;
+    const duration = 2500;
     const startTime = Date.now();
     
-    function animateFuel() {
+    function animateService() {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
         
-        player.fuel = startFuel + (targetFuel - startFuel) * progress;
+        player.fuel = startFuel + (100 - startFuel) * progress;
+        player.health = startHealth + (100 - startHealth) * progress;
         progressBar.style.width = `${progress * 100}%`;
         document.getElementById('currentFuel').textContent = Math.round(player.fuel);
         
         if (progress < 1) {
-            requestAnimationFrame(animateFuel);
+            requestAnimationFrame(animateService);
         } else {
             refuelingInProgress = false;
             progressDiv.style.display = 'none';
-            btn.textContent = '✅ Depo Dolu';
+            btn.textContent = '✅ Tamamlandı';
+            
+            let message = '';
+            if (fuelNeeded > 0) message += '⛽ Yakıt dolduruldu! ';
+            if (repairNeeded > 0) message += '🔧 Tamir edildi!';
             
             if (gameManager) {
-                gameManager.showNotification('⛽ Yakıt dolduruldu!', '');
+                gameManager.showNotification(message, '');
             }
             if (audioManager) {
                 audioManager.playSound('coin');
@@ -688,7 +722,7 @@ function startRefueling() {
         }
     }
     
-    animateFuel();
+    animateService();
 }
 
 // E tuşu ile yakıt alma
