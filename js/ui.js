@@ -468,13 +468,13 @@ class UI {
             wantedUI.id = 'wantedLevelUI';
             wantedUI.style.cssText = `
                 position: fixed;
-                top: 180px;
-                left: 20px;
+                top: 270px;
+                right: 20px;
                 z-index: 100;
                 background: rgba(0,0,0,0.8);
-                padding: 10px 15px;
-                border-radius: 8px;
-                border: 2px solid #ff0000;
+                padding: 8px 15px;
+                border-radius: 20px;
+                border: 2px solid #e74c3c;
                 display: none;
             `;
             document.body.appendChild(wantedUI);
@@ -482,55 +482,61 @@ class UI {
         
         if (level > 0) {
             wantedUI.style.display = 'block';
-            let stars = '🚨 ARANIYOR: ';
+            let stars = '🚨 ';
             for (let i = 0; i < Math.min(level, 5); i++) {
                 stars += '⭐';
             }
-            wantedUI.innerHTML = `<div style="color: #ff4444; font-weight: bold;">${stars}</div>`;
+            wantedUI.innerHTML = `<div style="color: #e74c3c; font-weight: bold; font-size: 14px;">${stars}</div>`;
         } else {
             wantedUI.style.display = 'none';
         }
     }
     
     updateHealth(health) {
-        // Hasar göstergesi - ekranın sol üstünde
+        // Hasar göstergesi - sağ üstte minimap altında
         let healthBar = document.getElementById('healthBarUI');
         if (!healthBar) {
             healthBar = document.createElement('div');
             healthBar.id = 'healthBarUI';
             healthBar.innerHTML = `
-                <div class="health-label">❤️ HEALTH</div>
-                <div class="health-bar-bg">
-                    <div class="health-bar-fill" id="healthFill"></div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">❤️</span>
+                    <div class="health-bar-bg">
+                        <div class="health-bar-fill" id="healthFill"></div>
+                    </div>
+                    <span id="healthPercent" style="color: #fff; font-size: 12px; font-weight: bold;">100%</span>
                 </div>
             `;
             healthBar.style.cssText = `
                 position: fixed;
-                top: 240px;
-                left: 20px;
+                top: 230px;
+                right: 20px;
                 z-index: 100;
                 background: rgba(0,0,0,0.7);
-                padding: 10px 15px;
-                border-radius: 8px;
-                border: 2px solid #ff4444;
+                padding: 8px 12px;
+                border-radius: 20px;
+                border: 2px solid rgba(255,100,100,0.5);
             `;
             document.body.appendChild(healthBar);
             
             const style = document.createElement('style');
             style.textContent = `
-                .health-label { color: #ff6666; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
-                .health-bar-bg { width: 150px; height: 15px; background: #333; border-radius: 8px; overflow: hidden; }
-                .health-bar-fill { height: 100%; background: linear-gradient(90deg, #ff4444, #44ff44); transition: width 0.3s; border-radius: 8px; }
+                #healthBarUI .health-bar-bg { width: 100px; height: 12px; background: #333; border-radius: 6px; overflow: hidden; }
+                #healthBarUI .health-bar-fill { height: 100%; transition: width 0.3s; border-radius: 6px; }
             `;
             document.head.appendChild(style);
         }
         
         const fill = document.getElementById('healthFill');
+        const percent = document.getElementById('healthPercent');
         if (fill) {
             fill.style.width = `${health}%`;
-            fill.style.background = health > 50 ? 'linear-gradient(90deg, #44ff44, #88ff88)' : 
-                                    health > 25 ? 'linear-gradient(90deg, #ffaa00, #ffcc00)' : 
-                                    'linear-gradient(90deg, #ff4444, #ff6666)';
+            fill.style.background = health > 50 ? 'linear-gradient(90deg, #27ae60, #2ecc71)' : 
+                                    health > 25 ? 'linear-gradient(90deg, #f39c12, #f1c40f)' : 
+                                    'linear-gradient(90deg, #e74c3c, #c0392b)';
+        }
+        if (percent) {
+            percent.textContent = `${Math.round(health)}%`;
         }
     }
 
@@ -540,64 +546,104 @@ class UI {
         const ctx = this.minimapCanvas.getContext('2d');
         const w = this.minimapCanvas.width;
         const h = this.minimapCanvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const radius = Math.min(w, h) / 2 - 5;
         
         ctx.clearRect(0, 0, w, h);
         
-        ctx.fillStyle = 'rgba(20, 25, 30, 0.95)';
+        // Yuvarlak arka plan
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.clip();
+        
+        // Gradient arka plan
+        const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        bgGrad.addColorStop(0, '#1a2a3a');
+        bgGrad.addColorStop(1, '#0d1520');
+        ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, w, h);
         
-        ctx.strokeStyle = 'rgba(60, 70, 80, 0.4)';
+        // Radar çizgileri
+        ctx.strokeStyle = 'rgba(102, 126, 234, 0.15)';
         ctx.lineWidth = 1;
-        for (let i = 0; i <= 4; i++) {
-            const pos = (i * w) / 4;
+        
+        // Dairesel çizgiler
+        for (let i = 1; i <= 3; i++) {
             ctx.beginPath();
-            ctx.moveTo(pos, 0);
-            ctx.lineTo(pos, h);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(0, pos);
-            ctx.lineTo(w, pos);
+            ctx.arc(cx, cy, (radius / 3) * i, 0, Math.PI * 2);
             ctx.stroke();
         }
         
+        // Çapraz çizgiler
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+            ctx.stroke();
+        }
+        
+        // Yollar
         const scale = w / mapSize;
-        const centerX = w / 2;
-        const centerY = h / 2;
         const offsetX = -playerPosition.x * scale;
         const offsetZ = -playerPosition.z * scale;
         
-        ctx.strokeStyle = '#555';
-        ctx.lineWidth = 10;
+        ctx.strokeStyle = 'rgba(100, 100, 100, 0.6)';
+        ctx.lineWidth = 8;
         ctx.beginPath();
-        ctx.moveTo(centerX + offsetX, 0);
-        ctx.lineTo(centerX + offsetX, h);
+        ctx.moveTo(cx + offsetX, 0);
+        ctx.lineTo(cx + offsetX, h);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(0, centerY + offsetZ);
-        ctx.lineTo(w, centerY + offsetZ);
-        ctx.stroke();
-        
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(-playerRotation);
-        
-        ctx.fillStyle = '#00ff00';
-        ctx.beginPath();
-        ctx.moveTo(0, -10);
-        ctx.lineTo(-6, 8);
-        ctx.lineTo(0, 4);
-        ctx.lineTo(6, 8);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1.5;
+        ctx.moveTo(0, cy + offsetZ);
+        ctx.lineTo(w, cy + offsetZ);
         ctx.stroke();
         
         ctx.restore();
         
+        // Dış çerçeve
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#667eea';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Oyuncu (ortada, dönen)
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-playerRotation);
+        
+        // Araba ikonu
+        ctx.fillStyle = '#00ff88';
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(0, -12);
+        ctx.lineTo(-7, 10);
+        ctx.lineTo(0, 6);
+        ctx.lineTo(7, 10);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+        
+        // Yön göstergeleri
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 11px Arial';
+        ctx.font = 'bold 10px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('N', w/2, 12);
+        ctx.textBaseline = 'middle';
+        ctx.fillText('N', cx, 10);
+        ctx.fillStyle = '#888';
+        ctx.fillText('S', cx, h - 8);
+        ctx.fillText('W', 8, cy);
+        ctx.fillText('E', w - 8, cy);
+        
+        // Koordinat
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${Math.round(playerPosition.x)}, ${Math.round(playerPosition.z)}`, cx, h - 20);
     }
 }

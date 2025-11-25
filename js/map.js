@@ -22,9 +22,9 @@ class GameMap {
         this.trafficLightTimer = 0;
         this.trafficLightState = 'green';
         
-        // Gün/Gece döngüsü - daha hızlı
+        // Gün/Gece döngüsü - çok daha hızlı
         this.gameTime = 8;
-        this.timeSpeed = 2; // Daha hızlı zaman
+        this.timeSpeed = 15; // 1 dakika = 15 oyun dakikası
         this.sunLight = null;
         this.ambientLight = null;
         

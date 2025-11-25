@@ -248,6 +248,14 @@ function initGame() {
     // Checkpoint sistemi
     checkpointSystem = new CheckpointSystem(scene);
     
+    // Polis sistemi
+    policeSystem = new PoliceSystem(scene, physicsWorld.world);
+    
+    // Tuning sistemi
+    if (!tuningSystem) {
+        tuningSystem = new TuningSystem();
+    }
+    
     // Yarış modu ise checkpoint'leri oluştur
     if (gameMode === 'circuit' || gameMode === 'sprint') {
         checkpointSystem.createRace(gameMode);
@@ -364,6 +372,16 @@ function animate() {
                 if (raceInfoPanel) {
                     raceInfoPanel.style.display = 'none';
                 }
+            }
+        }
+        
+        // Polis sistemi güncelle
+        if (policeSystem) {
+            policeSystem.update(player, delta);
+            
+            // Wanted level UI güncelle
+            if (ui && ui.updateWantedLevel) {
+                ui.updateWantedLevel(policeSystem.getWantedLevel());
             }
         }
     }

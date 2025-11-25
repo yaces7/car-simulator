@@ -133,18 +133,8 @@ class Player {
         this.health -= amount;
         if (this.health < 0) this.health = 0;
         
-        // Hasar efekti - kırmızı flash
-        if (this.mesh.children) {
-            this.mesh.traverse((child) => {
-                if (child.isMesh && child.material) {
-                    const originalColor = child.material.color.getHex();
-                    child.material.color.setHex(0xff0000);
-                    setTimeout(() => {
-                        child.material.color.setHex(originalColor);
-                    }, 100);
-                }
-            });
-        }
+        // Hasar efekti - kırmızı flash (geçici)
+        this.showDamageFlash();
         
         // Ses efekti
         if (typeof audioManager !== 'undefined' && audioManager) {
@@ -152,8 +142,57 @@ class Player {
         }
     }
     
+    showDamageFlash() {
+        // Kırmızı overlay efekti
+        let damageOverlay = document.getElementById('damageOverlay');
+        if (!damageOverlay) {
+            damageOverlay = document.createElement('div');
+            damageOverlay.id = 'damageOverlay';
+            damageOverlay.style.cssText = `
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                background: radial-gradient(ellipse at center, transparent 40%, rgba(255,0,0,0.4) 100%);
+                pointer-events: none;
+                z-index: 999;
+                opacity: 0;
+                transition: opacity 0.1s;
+            `;
+            document.body.appendChild(damageOverlay);
+        }
+        damageOverlay.style.opacity = '1';
+        setTimeout(() => {
+            damageOverlay.style.opacity = '0';
+        }, 150);
+    }
+    
     repair(amount) {
         this.health = Math.min(this.health + amount, this.maxHealth);
+        // Tamir efekti
+        this.showRepairEffect();
+    }
+    
+    showRepairEffect() {
+        let repairOverlay = document.getElementById('repairOverlay');
+        if (!repairOverlay) {
+            repairOverlay = document.createElement('div');
+            repairOverlay.id = 'repairOverlay';
+            repairOverlay.style.cssText = `
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                background: radial-gradient(ellipse at center, transparent 40%, rgba(0,255,100,0.3) 100%);
+                pointer-events: none;
+                z-index: 999;
+                opacity: 0;
+                transition: opacity 0.2s;
+            `;
+            document.body.appendChild(repairOverlay);
+        }
+        repairOverlay.style.opacity = '1';
+        setTimeout(() => {
+            repairOverlay.style.opacity = '0';
+        }, 300);
     }
     
     setupControls() {
@@ -263,8 +302,14 @@ class Player {
                 this.body.velocity.x -= forwardX * reverseAccel;
                 this.body.velocity.z -= forwardZ * reverseAccel;
                 this.fuel -= this.fuelConsumption * 0.5 * delta;
+                this.currentGear = -1;
             }
-            this.currentGear = -1;
+        }
+        
+        // İleri giderken geri vitesten çık
+        if (this.controls.forward && this.currentGear === -1) {
+            this.currentGear = 1;
+            this.rpm = this.idleRPM;
         }
         
         // Nitro yenileme
