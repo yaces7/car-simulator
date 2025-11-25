@@ -181,14 +181,15 @@ class UI {
         ctx.fillStyle = bgGrad;
         ctx.fill();
         
-        // RPM işaretleri (0-8, saat yönünün tersine, soldan başlayıp sağa)
-        const startAngle = Math.PI * 0.75; // Sol alt
-        const endAngle = Math.PI * 2.25; // Sağ alt
-        const totalAngle = endAngle - startAngle;
+        // RPM işaretleri (0-8) - Sol alttan başlayıp saat yönünde sağ alta
+        // 135° (sol alt) -> 45° (sağ alt) saat yönünde = 270° toplam açı
+        const startAngle = Math.PI * 0.75;  // 135° - sol alt (0 değeri)
+        const endAngle = Math.PI * 2.25;    // 405° (45°) - sağ alt (max değer)
+        const totalAngle = endAngle - startAngle; // 270° = 1.5π
         
-        for (let i = 0; i <= 8; i++) {
-            const angle = startAngle + (i / 8) * totalAngle;
-            const innerR = i % 2 === 0 ? r - 20 : r - 12;
+        for (let j = 0; j <= 8; j++) {
+            const angle = startAngle + (j / 8) * totalAngle;
+            const innerR = j % 2 === 0 ? r - 20 : r - 12;
             const outerR = r - 5;
             
             const x1 = cx + Math.cos(angle) * innerR;
@@ -199,20 +200,20 @@ class UI {
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
-            ctx.strokeStyle = i >= 7 ? '#ff4444' : '#888';
-            ctx.lineWidth = i % 2 === 0 ? 3 : 1;
+            ctx.strokeStyle = j >= 7 ? '#ff4444' : '#888';
+            ctx.lineWidth = j % 2 === 0 ? 3 : 1;
             ctx.stroke();
             
             // Sayılar
-            if (i % 2 === 0 || i === 7) {
+            if (j % 2 === 0 || j === 7) {
                 const textR = r - 32;
                 const tx = cx + Math.cos(angle) * textR;
                 const ty = cy + Math.sin(angle) * textR;
-                ctx.fillStyle = i >= 7 ? '#ff6666' : '#ccc';
+                ctx.fillStyle = j >= 7 ? '#ff6666' : '#ccc';
                 ctx.font = 'bold 14px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(i.toString(), tx, ty);
+                ctx.fillText(j.toString(), tx, ty);
             }
         }
         
@@ -222,13 +223,13 @@ class UI {
         ctx.textAlign = 'center';
         ctx.fillText('x100r/min', cx, cy + 35);
         
-        // İbre
-        const rpmValue = Math.min(rpm / 1000, 8);
+        // İbre - saat yönünde dönüş
+        const rpmValue = Math.min(Math.max(rpm / 1000, 0), 8);
         const needleAngle = startAngle + (rpmValue / 8) * totalAngle;
         
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.rotate(needleAngle - Math.PI / 2);
+        ctx.rotate(needleAngle + Math.PI / 2); // +90° düzeltme (ibre yukarı bakacak şekilde)
         
         // İbre gölge
         ctx.beginPath();
@@ -291,13 +292,13 @@ class UI {
         ctx.fillStyle = bgGrad;
         ctx.fill();
         
-        // Hız işaretleri (0-280, saat yönünün tersine)
-        const startAngle = Math.PI * 0.75;
-        const endAngle = Math.PI * 2.25;
+        // Hız işaretleri (0-280) - Sol alttan başlayıp saat yönünde sağ alta
+        const startAngle = Math.PI * 0.75;  // 135° - sol alt (0 değeri)
+        const endAngle = Math.PI * 2.25;    // 405° (45°) - sağ alt (max değer)
         const totalAngle = endAngle - startAngle;
         const speedMarks = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280];
         
-        speedMarks.forEach((mark, i) => {
+        speedMarks.forEach((mark) => {
             const angle = startAngle + (mark / 280) * totalAngle;
             const innerR = mark % 40 === 0 ? r - 20 : r - 12;
             const outerR = r - 5;
@@ -333,13 +334,22 @@ class UI {
         ctx.textAlign = 'center';
         ctx.fillText('km/h', cx, cy + 35);
         
-        // İbre
+        // İbre - saat yönünde dönüş
         const clampedSpeed = Math.min(Math.max(speed, 0), 280);
         const needleAngle = startAngle + (clampedSpeed / 280) * totalAngle;
         
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.rotate(needleAngle - Math.PI / 2);
+        ctx.rotate(needleAngle + Math.PI / 2); // +90° düzeltme
+        
+        // İbre gölge
+        ctx.beginPath();
+        ctx.moveTo(-3, 15);
+        ctx.lineTo(0, -r + 25);
+        ctx.lineTo(3, 15);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fill();
         
         // İbre
         const needleGrad = ctx.createLinearGradient(0, -r + 25, 0, 15);
@@ -449,6 +459,37 @@ class UI {
     
     updateFuel(fuel) {
         this.drawFuelGauge(fuel);
+    }
+    
+    updateWantedLevel(level) {
+        let wantedUI = document.getElementById('wantedLevelUI');
+        if (!wantedUI) {
+            wantedUI = document.createElement('div');
+            wantedUI.id = 'wantedLevelUI';
+            wantedUI.style.cssText = `
+                position: fixed;
+                top: 180px;
+                left: 20px;
+                z-index: 100;
+                background: rgba(0,0,0,0.8);
+                padding: 10px 15px;
+                border-radius: 8px;
+                border: 2px solid #ff0000;
+                display: none;
+            `;
+            document.body.appendChild(wantedUI);
+        }
+        
+        if (level > 0) {
+            wantedUI.style.display = 'block';
+            let stars = '🚨 ARANIYOR: ';
+            for (let i = 0; i < Math.min(level, 5); i++) {
+                stars += '⭐';
+            }
+            wantedUI.innerHTML = `<div style="color: #ff4444; font-weight: bold;">${stars}</div>`;
+        } else {
+            wantedUI.style.display = 'none';
+        }
     }
     
     updateHealth(health) {
