@@ -16,8 +16,7 @@ const CAR_MODELS = [
             braking: 0.7
         },
         color: 0x3498db,
-        // GLB model yolu (varsa) - şimdilik null (prosedürel model kullan)
-        modelUrl: null
+        modelUrl: 'models/sedan.glb'
     },
     {
         id: 1,
@@ -31,7 +30,7 @@ const CAR_MODELS = [
             braking: 0.8
         },
         color: 0x2ecc71,
-        modelUrl: null
+        modelUrl: 'models/suv.glb'
     },
     {
         id: 2,
@@ -45,7 +44,7 @@ const CAR_MODELS = [
             braking: 0.9
         },
         color: 0xe74c3c,
-        modelUrl: null
+        modelUrl: 'models/sports.glb'
     },
     {
         id: 3,
@@ -59,7 +58,7 @@ const CAR_MODELS = [
             braking: 0.7
         },
         color: 0xf39c12,
-        modelUrl: null
+        modelUrl: 'models/muscle.glb'
     },
     {
         id: 4,
@@ -73,7 +72,7 @@ const CAR_MODELS = [
             braking: 1.0
         },
         color: 0x9b59b6,
-        modelUrl: null
+        modelUrl: 'models/supercar.glb'
     }
 ];
 
@@ -94,9 +93,12 @@ function loadGLBModel(url, carData, callback) {
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
             
+            // Wrapper group oluştur
+            const wrapper = new THREE.Group();
+            
             // Modeli merkeze al
             model.position.x = -center.x;
-            model.position.y = -center.y;
+            model.position.y = -box.min.y; // Zeminde olsun
             model.position.z = -center.z;
             
             // Otomatik ölçeklendirme - hedef boyut 4 birim (araba boyutu)
@@ -105,21 +107,13 @@ function loadGLBModel(url, carData, callback) {
             const scale = targetSize / maxDim;
             model.scale.set(scale, scale, scale);
             
-            // Wrapper group oluştur
-            const wrapper = new THREE.Group();
             wrapper.add(model);
             
-            // Materyal ayarları
+            // Sadece gölge ayarları - materyal değiştirme yok
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
-                    // Renk uygula
-                    if (child.material) {
-                        child.material.color.setHex(carData.color);
-                        child.material.metalness = 0.6;
-                        child.material.roughness = 0.4;
-                    }
                 }
             });
             

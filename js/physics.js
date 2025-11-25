@@ -6,10 +6,13 @@
 class PhysicsWorld {
     constructor() {
         this.world = new CANNON.World();
-        this.world.gravity.set(0, -20, 0);
+        this.world.gravity.set(0, -10, 0); // Daha hafif yerçekimi
         this.world.broadphase = new CANNON.NaiveBroadphase();
-        this.world.solver.iterations = 10;
-        this.world.defaultContactMaterial.friction = 0.4;
+        this.world.solver.iterations = 5;
+        
+        // Çok düşük sürtünme
+        this.world.defaultContactMaterial.friction = 0.01;
+        this.world.defaultContactMaterial.restitution = 0.0;
         
         this.bodies = [];
         this.meshes = [];

@@ -1,6 +1,6 @@
 // Ana oyun yöneticisi
 let scene, camera, renderer;
-let player, gameMap, ui;
+let player, gameMap, ui, physicsWorld;
 let gameRunning = false;
 let selectedCarId = 0;
 
@@ -113,7 +113,7 @@ function initGame() {
     scene.add(sunLight);
     
     // Fizik dünyası oluştur
-    const physicsWorld = new PhysicsWorld();
+    physicsWorld = new PhysicsWorld();
     
     // Harita oluştur
     gameMap = new GameMap(scene, physicsWorld);
@@ -148,6 +148,11 @@ function animate() {
     requestAnimationFrame(animate);
     
     const delta = 0.016; // ~60 FPS
+    
+    // Fizik güncelle
+    if (physicsWorld) {
+        physicsWorld.update(delta);
+    }
     
     // Oyuncu güncelle
     if (player) {

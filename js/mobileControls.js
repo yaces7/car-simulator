@@ -11,25 +11,23 @@ class MobileControls {
         this.joystickStartPos = { x: 0, y: 0 };
         this.joystickCurrentPos = { x: 0, y: 0 };
         
-        // Butonlar
-        this.forwardPressed = false;
-        this.reversePressed = false;
-        this.brakePressed = false;
-        this.nitroPressed = false;
-        
         this.init();
     }
     
     init() {
-        // Mobil cihaz kontrolü
+        // Mobil cihaz kontrolü - daha geniş algılama
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const isSmallScreen = window.innerWidth <= 1024;
         
-        if (!isMobile && !isTouchDevice) {
-            return; // Mobil değilse kontrolleri gösterme
+        // Mobil kontrolleri göster
+        const mobileControls = document.getElementById('mobileControls');
+        if (mobileControls && (isMobile || isTouchDevice || isSmallScreen)) {
+            mobileControls.style.display = 'block';
+            this.active = true;
         }
         
-        this.active = true;
+        if (!this.active) return;
         
         // Joystick elementleri
         this.joystickBase = document.querySelector('.joystick-base');
@@ -41,11 +39,14 @@ class MobileControls {
         
         // Buton elementleri
         this.setupButtons();
+        
+        console.log('Mobil kontroller aktif');
     }
     
     setupJoystick() {
         const handleStart = (e) => {
             e.preventDefault();
+            e.stopPropagation();
             this.joystickActive = true;
             const rect = this.joystickBase.getBoundingClientRect();
             this.joystickStartPos = {
@@ -63,7 +64,7 @@ class MobileControls {
             const deltaY = touch.clientY - this.joystickStartPos.y;
             
             // Maksimum mesafe
-            const maxDistance = 40;
+            const maxDistance = 50;
             const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
             
             if (distance > maxDistance) {
@@ -76,22 +77,23 @@ class MobileControls {
             }
             
             // Stick pozisyonunu güncelle
-            this.joystickStick.style.transform = 
-                `translate(calc(-50% + ${this.joystickCurrentPos.x}px), calc(-50% + ${this.joystickCurrentPos.y}px))`;
+            if (this.joystickStick) {
+                this.joystickStick.style.transform = 
+                    `translate(calc(-50% + ${this.joystickCurrentPos.x}px), calc(-50% + ${this.joystickCurrentPos.y}px))`;
+            }
             
             // Oyuncu kontrollerini güncelle
-            if (this.player && this.player.controls) {
-                const normalizedX = this.joystickCurrentPos.x / maxDistance;
-                this.player.controls.left = normalizedX < -0.2;
-                this.player.controls.right = normalizedX > 0.2;
-            }
+            this.updatePlayerControls();
         };
         
         const handleEnd = (e) => {
             e.preventDefault();
             this.joystickActive = false;
             this.joystickCurrentPos = { x: 0, y: 0 };
-            this.joystickStick.style.transform = 'translate(-50%, -50%)';
+            
+            if (this.joystickStick) {
+                this.joystickStick.style.transform = 'translate(-50%, -50%)';
+            }
             
             if (this.player && this.player.controls) {
                 this.player.controls.left = false;
@@ -100,95 +102,67 @@ class MobileControls {
         };
         
         // Touch events
-        this.joystickBase.addEventListener('touchstart', handleStart);
-        document.addEventListener('touchmove', handleMove);
-        document.addEventListener('touchend', handleEnd);
+        this.joystickBase.addEventListener('touchstart', handleStart, { passive: false });
+        this.joystickBase.addEventListener('touchmove', handleMove, { passive: false });
+        this.joystickBase.addEventListener('touchend', handleEnd, { passive: false });
+        this.joystickBase.addEventListener('touchcancel', handleEnd, { passive: false });
+    }
+    
+    updatePlayerControls() {
+        if (!this.player || !this.player.controls) return;
         
-        // Mouse events (test için)
-        this.joystickBase.addEventListener('mousedown', handleStart);
-        document.addEventListener('mousemove', handleMove);
-        document.addEventListener('mouseup', handleEnd);
+        const maxDistance = 50;
+        const normalizedX = this.joystickCurrentPos.x / maxDistance;
+        
+        // Sol/Sağ
+        this.player.controls.left = normalizedX < -0.3;
+        this.player.controls.right = normalizedX > 0.3;
     }
     
     setupButtons() {
         // İleri butonu
-        const forwardBtn = document.getElementById('forwardBtn');
-        if (forwardBtn) {
-            forwardBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.forwardPressed = true;
-                if (this.player && this.player.controls) {
-                    this.player.controls.forward = true;
-                }
-            });
-            forwardBtn.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                this.forwardPressed = false;
-                if (this.player && this.player.controls) {
-                    this.player.controls.forward = false;
-                }
-            });
-        }
+        this.setupButton('forwardBtn', 'forward');
         
         // Geri butonu
-        const reverseBtn = document.getElementById('reverseBtn');
-        if (reverseBtn) {
-            reverseBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.reversePressed = true;
-                if (this.player && this.player.controls) {
-                    this.player.controls.backward = true;
-                }
-            });
-            reverseBtn.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                this.reversePressed = false;
-                if (this.player && this.player.controls) {
-                    this.player.controls.backward = false;
-                }
-            });
-        }
+        this.setupButton('reverseBtn', 'backward');
         
         // Fren butonu
-        const brakeBtn = document.getElementById('brakeBtn');
-        if (brakeBtn) {
-            brakeBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.brakePressed = true;
-                if (this.player && this.player.controls) {
-                    this.player.controls.brake = true;
-                }
-            });
-            brakeBtn.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                this.brakePressed = false;
-                if (this.player && this.player.controls) {
-                    this.player.controls.brake = false;
-                }
-            });
-        }
+        this.setupButton('brakeBtn', 'brake');
         
         // Nitro butonu
-        const nitroBtn = document.getElementById('nitroBtn');
-        if (nitroBtn) {
-            nitroBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.nitroPressed = true;
-                if (this.player && this.player.controls) {
-                    this.player.controls.nitro = true;
-                }
-            });
-            nitroBtn.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                this.nitroPressed = false;
-                if (this.player && this.player.controls) {
-                    this.player.controls.nitro = false;
-                }
-            });
-        }
+        this.setupButton('nitroBtn', 'nitro');
     }
     
-    update() {
-        // Her frame'de çağrılabilir
+    setupButton(buttonId, controlName) {
+        const btn = document.getElementById(buttonId);
+        if (!btn) return;
+        
+        const activate = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.player && this.player.controls) {
+                this.player.controls[controlName] = true;
+            }
+            btn.classList.add('active');
+        };
+        
+        const deactivate = (e) => {
+            e.preventDefault();
+            if (this.player && this.player.controls) {
+                this.player.controls[controlName] = false;
+            }
+            btn.classList.remove('active');
+        };
+        
+        // Touch events
+        btn.addEventListener('touchstart', activate, { passive: false });
+        btn.addEventListener('touchend', deactivate, { passive: false });
+        btn.addEventListener('touchcancel', deactivate, { passive: false });
+        btn.addEventListener('touchleave', deactivate, { passive: false });
+        
+        // Mouse events (test için)
+        btn.addEventListener('mousedown', activate);
+        btn.addEventListener('mouseup', deactivate);
+        btn.addEventListener('mouseleave', deactivate);
     }
 }

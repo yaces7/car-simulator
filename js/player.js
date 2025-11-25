@@ -4,7 +4,7 @@
  */
 
 class Player {
-    constructor(scene, physicsWorld, carData, spawnPosition = { x: 0, y: 2, z: 0 }) {
+    constructor(scene, physicsWorld, carData, spawnPosition = { x: 0, y: 5, z: 0 }) {
         this.scene = scene;
         this.physicsWorld = physicsWorld;
         this.carData = carData;
@@ -28,15 +28,16 @@ class Player {
         }
         
         // Fizik gövdesi
-        const shape = new CANNON.Box(new CANNON.Vec3(1, 0.5, 2));
+        const shape = new CANNON.Box(new CANNON.Vec3(1, 0.4, 2));
         this.body = new CANNON.Body({
-            mass: carData.stats.weight,
+            mass: 100, // Hafif - kolay hareket
             shape: shape,
             position: new CANNON.Vec3(spawnPosition.x, spawnPosition.y, spawnPosition.z),
-            linearDamping: 0.3,
+            linearDamping: 0.01, // Çok düşük
             angularDamping: 0.5
         });
-        physicsWorld.addBody(this.body, this.mesh);
+        
+        physicsWorld.addBody(this.body, null);
         
         // Kontroller
         this.controls = {
@@ -313,35 +314,87 @@ class Player {
     update(delta) {
         if (!this.body || !this.mesh) return;
         
-        // Fizik güncelleme
-        const force = 5000 * this.carData.stats.acceleration;
-        const turnForce = 3;
+        // Hız hesapla
+        const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.z ** 2);
         
+        // İvme ayarları - güçlü ivme
+        const acceleration = 200 * this.carData.stats.acceleration;
+        const maxSpeed = this.carData.stats.maxSpeed / 3.6; // km/h -> m/s
+        
+        // Arabanın yönünü al
+        const angle = this.mesh.rotation.y;
+        const forwardX = Math.sin(angle);
+        const forwardZ = Math.cos(angle);
+        
+        // İleri git
         if (this.controls.forward) {
-            this.body.applyForce(
-                new CANNON.Vec3(0, 0, -force),
-                this.body.position
-            );
-        }
-        if (this.controls.backward) {
-            this.body.applyForce(
-                new CANNON.Vec3(0, 0, force * 0.5),
-                this.body.position
-            );
-        }
-        if (this.controls.left) {
-            this.body.angularVelocity.y = turnForce;
-        }
-        if (this.controls.right) {
-            this.body.angularVelocity.y = -turnForce;
-        }
-        if (this.controls.brake) {
-            this.body.velocity.scale(0.95, this.body.velocity);
+            this.body.velocity.x += forwardX * acceleration * delta;
+            this.body.velocity.z += forwardZ * acceleration * delta;
         }
         
-        // Mesh pozisyonunu fizik gövdesine senkronize et
+        // Debug
+        if (Math.random() < 0.02) {
+            console.log('Pos:', this.body.position.x.toFixed(1), this.body.position.y.toFixed(1), this.body.position.z.toFixed(1), 
+                        'Vel:', this.body.velocity.z.toFixed(1));
+        }
+        
+        // Geri git
+        if (this.controls.backward) {
+            const reverseMaxSpeed = 10; // Geri max 36 km/h
+            if (speed < reverseMaxSpeed) {
+                this.body.velocity.x -= forwardX * acceleration * 0.4 * delta;
+                this.body.velocity.z -= forwardZ * acceleration * 0.4 * delta;
+            }
+        }
+        
+        // Dönüş
+        const turnSpeed = 3.0 * this.carData.stats.handling;
+        if (speed > 1) {
+            if (this.controls.left) {
+                this.mesh.rotation.y += turnSpeed * delta;
+            }
+            if (this.controls.right) {
+                this.mesh.rotation.y -= turnSpeed * delta;
+            }
+        }
+        
+        // Fren
+        if (this.controls.brake) {
+            this.body.velocity.x *= 0.9;
+            this.body.velocity.z *= 0.9;
+        }
+        
+        // Nitro
+        if (this.controls.nitro && speed > 1) {
+            this.body.velocity.x += forwardX * 100 * delta;
+            this.body.velocity.z += forwardZ * 100 * delta;
+        }
+        
+        // Doğal yavaşlama
+        if (!this.controls.forward && !this.controls.backward) {
+            this.body.velocity.x *= 0.99;
+            this.body.velocity.z *= 0.99;
+        }
+        
+        // Hız limiti (nitro ile biraz aşılabilir)
+        const actualMaxSpeed = this.controls.nitro ? maxSpeed * 1.3 : maxSpeed;
+        if (speed > actualMaxSpeed) {
+            const ratio = actualMaxSpeed / speed;
+            this.body.velocity.x *= ratio;
+            this.body.velocity.z *= ratio;
+        }
+        
+        // Fizik gövdesinin rotasyonunu güncelle
+        this.body.quaternion.setFromEuler(0, this.mesh.rotation.y, 0);
+        
+        // Takla atmasın
+        this.body.angularVelocity.x = 0;
+        this.body.angularVelocity.z = 0;
+        this.body.angularVelocity.y = 0;
+        
+        // Mesh pozisyonunu güncelle
         this.mesh.position.copy(this.body.position);
-        this.mesh.quaternion.copy(this.body.quaternion);
+        this.mesh.quaternion.setFromEuler(new THREE.Euler(0, this.mesh.rotation.y, 0));
     }
     
     getSpeed() {

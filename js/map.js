@@ -12,37 +12,13 @@ class GameMap {
         this.createRoads();
         this.createEnvironment();
         this.createSkybox();
-        this.setupLighting();
     }
     
     createGround() {
-        // Zemin
+        // Büyük yeşil zemin
         const groundSize = 2000;
-        const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, 50, 50);
-        
-        // Doku oluşturma
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // Çim dokusu
-        ctx.fillStyle = '#2d5016';
-        ctx.fillRect(0, 0, 512, 512);
-        for (let i = 0; i < 5000; i++) {
-            ctx.fillStyle = Math.random() > 0.5 ? '#3a6b1f' : '#234010';
-            ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(50, 50);
-        
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-            map: texture,
-            roughness: 0.9
-        });
+        const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, 100, 100);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x3a6b1f });
         
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
@@ -58,129 +34,100 @@ class GameMap {
     }
     
     createRoads() {
-        // Ana yol ağı - 3-4 km uzunluğunda
-        const roadWidth = 20;
-        const roadSegments = [
-            { start: [-500, 0], end: [500, 0] },      // Düz yol
-            { start: [500, 0], end: [500, 400] },     // Sağa dönüş
-            { start: [500, 400], end: [200, 600] },   // Viraj
-            { start: [200, 600], end: [-300, 600] },  // Düz
-            { start: [-300, 600], end: [-500, 400] }, // Viraj
-            { start: [-500, 400], end: [-500, 0] }    // Geri dönüş
-        ];
+        const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
         
-        // Asfalt dokusu
-        const roadCanvas = document.createElement('canvas');
-        roadCanvas.width = 512;
-        roadCanvas.height = 512;
-        const roadCtx = roadCanvas.getContext('2d');
+        // Ana yol - Kuzey-Güney
+        const road1 = new THREE.Mesh(
+            new THREE.PlaneGeometry(20, 1500),
+            roadMaterial
+        );
+        road1.rotation.x = -Math.PI / 2;
+        road1.position.y = 0.1;
+        this.scene.add(road1);
         
-        // Asfalt rengi
-        roadCtx.fillStyle = '#2a2a2a';
-        roadCtx.fillRect(0, 0, 512, 512);
+        // Çapraz yol - Doğu-Batı
+        const road2 = new THREE.Mesh(
+            new THREE.PlaneGeometry(20, 1500),
+            roadMaterial
+        );
+        road2.rotation.x = -Math.PI / 2;
+        road2.rotation.z = Math.PI / 2;
+        road2.position.y = 0.1;
+        this.scene.add(road2);
         
-        // Yol çizgileri ve detaylar
-        for (let i = 0; i < 1000; i++) {
-            roadCtx.fillStyle = Math.random() > 0.5 ? '#333333' : '#222222';
-            roadCtx.fillRect(Math.random() * 512, Math.random() * 512, 3, 3);
+        // Çapraz yol 2
+        const road3 = new THREE.Mesh(
+            new THREE.PlaneGeometry(15, 800),
+            roadMaterial
+        );
+        road3.rotation.x = -Math.PI / 2;
+        road3.rotation.z = Math.PI / 4;
+        road3.position.set(200, 0.1, 200);
+        this.scene.add(road3);
+        
+        // Dairesel kavşak
+        const circleRoad = new THREE.Mesh(
+            new THREE.RingGeometry(30, 50, 32),
+            roadMaterial
+        );
+        circleRoad.rotation.x = -Math.PI / 2;
+        circleRoad.position.y = 0.1;
+        this.scene.add(circleRoad);
+        
+        // Yol çizgileri
+        for (let i = -700; i < 700; i += 15) {
+            // Kuzey-Güney çizgiler
+            const line1 = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.4, 6),
+                lineMaterial
+            );
+            line1.rotation.x = -Math.PI / 2;
+            line1.position.set(0, 0.15, i);
+            this.scene.add(line1);
+            
+            // Doğu-Batı çizgiler
+            const line2 = new THREE.Mesh(
+                new THREE.PlaneGeometry(6, 0.4),
+                lineMaterial
+            );
+            line2.rotation.x = -Math.PI / 2;
+            line2.position.set(i, 0.15, 0);
+            this.scene.add(line2);
         }
-        
-        const roadTexture = new THREE.CanvasTexture(roadCanvas);
-        roadTexture.wrapS = THREE.RepeatWrapping;
-        roadTexture.wrapT = THREE.RepeatWrapping;
-        
-        const roadMaterial = new THREE.MeshStandardMaterial({ 
-            map: roadTexture,
-            roughness: 0.7
-        });
-        
-        // Yol segmentlerini oluştur
-        roadSegments.forEach(segment => {
-            const length = Math.sqrt(
-                Math.pow(segment.end[0] - segment.start[0], 2) + 
-                Math.pow(segment.end[1] - segment.start[1], 2)
-            );
-            
-            const roadGeometry = new THREE.PlaneGeometry(roadWidth, length);
-            const road = new THREE.Mesh(roadGeometry, roadMaterial);
-            
-            const centerX = (segment.start[0] + segment.end[0]) / 2;
-            const centerZ = (segment.start[1] + segment.end[1]) / 2;
-            
-            road.position.set(centerX, 0.1, centerZ);
-            road.rotation.x = -Math.PI / 2;
-            
-            const angle = Math.atan2(
-                segment.end[0] - segment.start[0],
-                segment.end[1] - segment.start[1]
-            );
-            road.rotation.z = -angle;
-            
-            road.receiveShadow = true;
-            this.scene.add(road);
-            
-            // Yol kenarı çizgileri
-            this.createRoadLines(segment, roadWidth);
-        });
         
         // Rampa
-        this.createRamp(100, 0, 200);
+        this.createRamp(100, 0, 150);
+        this.createRamp(-150, 0, -200);
         
         // Köprü
-        this.createBridge(-200, 0, 300);
-    }
-    
-    createRoadLines(segment, roadWidth) {
-        const lineGeometry = new THREE.BoxGeometry(0.3, 0.05, 5);
-        const lineMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-        
-        const length = Math.sqrt(
-            Math.pow(segment.end[0] - segment.start[0], 2) + 
-            Math.pow(segment.end[1] - segment.start[1], 2)
-        );
-        
-        const angle = Math.atan2(
-            segment.end[0] - segment.start[0],
-            segment.end[1] - segment.start[1]
-        );
-        
-        // Orta çizgi
-        for (let i = 0; i < length; i += 10) {
-            const t = i / length;
-            const x = segment.start[0] + (segment.end[0] - segment.start[0]) * t;
-            const z = segment.start[1] + (segment.end[1] - segment.start[1]) * t;
-            
-            const line = new THREE.Mesh(lineGeometry, lineMaterial);
-            line.position.set(x, 0.15, z);
-            line.rotation.y = -angle;
-            this.scene.add(line);
-        }
+        this.createBridge(300, 0, 0);
     }
     
     createRamp(x, y, z) {
-        const rampGeometry = new THREE.BoxGeometry(20, 1, 30);
-        const rampMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
+        const rampGeometry = new THREE.BoxGeometry(15, 0.5, 25);
+        const rampMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
         const ramp = new THREE.Mesh(rampGeometry, rampMaterial);
         
         ramp.position.set(x, y + 2, z);
-        ramp.rotation.x = Math.PI / 8;
+        ramp.rotation.x = Math.PI / 10;
         ramp.castShadow = true;
         ramp.receiveShadow = true;
         this.scene.add(ramp);
         
         // Fizik
-        const rampShape = new CANNON.Box(new CANNON.Vec3(10, 0.5, 15));
+        const rampShape = new CANNON.Box(new CANNON.Vec3(7.5, 0.25, 12.5));
         const rampBody = new CANNON.Body({ mass: 0 });
         rampBody.addShape(rampShape);
         rampBody.position.set(x, y + 2, z);
-        rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 8);
+        rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 10);
         this.physicsWorld.addBody(rampBody);
     }
     
     createBridge(x, y, z) {
         // Köprü platformu
-        const bridgeGeometry = new THREE.BoxGeometry(20, 1, 60);
-        const bridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+        const bridgeGeometry = new THREE.BoxGeometry(20, 1, 50);
+        const bridgeMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
         const bridge = new THREE.Mesh(bridgeGeometry, bridgeMaterial);
         
         bridge.position.set(x, y + 5, z);
@@ -189,7 +136,7 @@ class GameMap {
         this.scene.add(bridge);
         
         // Fizik
-        const bridgeShape = new CANNON.Box(new CANNON.Vec3(10, 0.5, 30));
+        const bridgeShape = new CANNON.Box(new CANNON.Vec3(10, 0.5, 25));
         const bridgeBody = new CANNON.Body({ mass: 0 });
         bridgeBody.addShape(bridgeShape);
         bridgeBody.position.set(x, y + 5, z);
@@ -197,81 +144,125 @@ class GameMap {
         
         // Köprü direkleri
         const pillarGeometry = new THREE.CylinderGeometry(1, 1, 10, 8);
-        const pillarMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
+        const pillarMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
         
         [-8, 8].forEach(offset => {
-            const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-            pillar.position.set(x + offset, y, z - 20);
-            pillar.castShadow = true;
-            this.scene.add(pillar);
+            const pillar1 = new THREE.Mesh(pillarGeometry, pillarMaterial);
+            pillar1.position.set(x + offset, y, z - 20);
+            pillar1.castShadow = true;
+            this.scene.add(pillar1);
             
             const pillar2 = new THREE.Mesh(pillarGeometry, pillarMaterial);
             pillar2.position.set(x + offset, y, z + 20);
             pillar2.castShadow = true;
             this.scene.add(pillar2);
         });
+        
+        // Rampa yukarı
+        const rampUp = new THREE.Mesh(
+            new THREE.BoxGeometry(20, 0.5, 20),
+            bridgeMaterial
+        );
+        rampUp.position.set(x, y + 2.5, z - 35);
+        rampUp.rotation.x = -Math.PI / 12;
+        this.scene.add(rampUp);
+        
+        // Rampa aşağı
+        const rampDown = new THREE.Mesh(
+            new THREE.BoxGeometry(20, 0.5, 20),
+            bridgeMaterial
+        );
+        rampDown.position.set(x, y + 2.5, z + 35);
+        rampDown.rotation.x = Math.PI / 12;
+        this.scene.add(rampDown);
     }
     
     createEnvironment() {
-        // Ağaçlar
-        for (let i = 0; i < 100; i++) {
-            const x = (Math.random() - 0.5) * 1800;
-            const z = (Math.random() - 0.5) * 1800;
+        // Ağaçlar - daha fazla
+        for (let i = 0; i < 150; i++) {
+            const x = (Math.random() - 0.5) * 1600;
+            const z = (Math.random() - 0.5) * 1600;
             
             // Yoldan uzak olsun
-            if (Math.abs(x) < 50 && Math.abs(z) < 700) continue;
+            if (Math.abs(x) < 35 && Math.abs(z) < 800) continue;
+            if (Math.abs(z) < 35 && Math.abs(x) < 800) continue;
             
             this.createTree(x, z);
         }
         
-        // Binalar
-        for (let i = 0; i < 20; i++) {
-            const x = (Math.random() - 0.5) * 1500;
-            const z = (Math.random() - 0.5) * 1500;
+        // Binalar - şehir merkezi
+        for (let i = 0; i < 40; i++) {
+            const x = (Math.random() - 0.5) * 1200;
+            const z = (Math.random() - 0.5) * 1200;
             
-            if (Math.abs(x) < 100 && Math.abs(z) < 700) continue;
+            if (Math.abs(x) < 60 && Math.abs(z) < 800) continue;
+            if (Math.abs(z) < 60 && Math.abs(x) < 800) continue;
             
             this.createBuilding(x, z);
         }
         
         // Işık direkleri
-        for (let i = -500; i < 500; i += 50) {
-            this.createStreetLight(25, i);
-            this.createStreetLight(-25, i);
+        for (let i = -600; i <= 600; i += 80) {
+            if (Math.abs(i) > 50) {
+                this.createStreetLight(25, i);
+                this.createStreetLight(-25, i);
+                this.createStreetLight(i, 25);
+                this.createStreetLight(i, -25);
+            }
         }
         
-        // Tabelalar
-        for (let i = 0; i < 30; i++) {
-            const x = (Math.random() - 0.5) * 1000;
-            const z = (Math.random() - 0.5) * 1000;
-            this.createSign(x, z);
-        }
+        // Bariyerler
+        this.createBarriers();
     }
     
     createTree(x, z) {
         const group = new THREE.Group();
+        const treeType = Math.random();
         
-        // Gövde
-        const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 5, 8);
-        const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2511 });
-        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-        trunk.position.y = 2.5;
-        trunk.castShadow = true;
-        group.add(trunk);
-        
-        // Yapraklar
-        const leavesGeometry = new THREE.SphereGeometry(3, 8, 8);
-        const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5016 });
-        const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-        leaves.position.y = 6;
-        leaves.castShadow = true;
-        group.add(leaves);
+        if (treeType < 0.5) {
+            // Çam ağacı
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.4, 0.6, 4, 6),
+                new THREE.MeshLambertMaterial({ color: 0x4a2511 })
+            );
+            trunk.position.y = 2;
+            trunk.castShadow = true;
+            group.add(trunk);
+            
+            // Yapraklar - 3 katman
+            for (let i = 0; i < 3; i++) {
+                const leaves = new THREE.Mesh(
+                    new THREE.ConeGeometry(3 - i * 0.7, 4, 8),
+                    new THREE.MeshLambertMaterial({ color: 0x1a4d1a })
+                );
+                leaves.position.y = 5 + i * 2;
+                leaves.castShadow = true;
+                group.add(leaves);
+            }
+        } else {
+            // Normal ağaç
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.5, 0.7, 5, 6),
+                new THREE.MeshLambertMaterial({ color: 0x4a2511 })
+            );
+            trunk.position.y = 2.5;
+            trunk.castShadow = true;
+            group.add(trunk);
+            
+            const leaves = new THREE.Mesh(
+                new THREE.SphereGeometry(3, 8, 6),
+                new THREE.MeshLambertMaterial({ color: 0x2d5016 })
+            );
+            leaves.position.y = 6;
+            leaves.castShadow = true;
+            group.add(leaves);
+        }
         
         group.position.set(x, 0, z);
         this.scene.add(group);
         
-        // Fizik (basit silindir)
-        const treeShape = new CANNON.Cylinder(0.7, 0.7, 5, 8);
+        // Fizik
+        const treeShape = new CANNON.Cylinder(0.7, 0.7, 5, 6);
         const treeBody = new CANNON.Body({ mass: 0 });
         treeBody.addShape(treeShape);
         treeBody.position.set(x, 2.5, z);
@@ -279,20 +270,42 @@ class GameMap {
     }
     
     createBuilding(x, z) {
-        const height = 20 + Math.random() * 40;
-        const width = 10 + Math.random() * 10;
-        const depth = 10 + Math.random() * 10;
+        const height = 15 + Math.random() * 35;
+        const width = 8 + Math.random() * 12;
+        const depth = 8 + Math.random() * 12;
         
-        const buildingGeometry = new THREE.BoxGeometry(width, height, depth);
-        const buildingMaterial = new THREE.MeshStandardMaterial({ 
-            color: new THREE.Color().setHSL(Math.random(), 0.3, 0.5)
-        });
-        const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+        const colors = [0x607d8b, 0x795548, 0x9e9e9e, 0x5d4037, 0x455a64];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        
+        const building = new THREE.Mesh(
+            new THREE.BoxGeometry(width, height, depth),
+            new THREE.MeshLambertMaterial({ color: color })
+        );
         
         building.position.set(x, height / 2, z);
         building.castShadow = true;
         building.receiveShadow = true;
         this.scene.add(building);
+        
+        // Pencereler
+        const windowMaterial = new THREE.MeshBasicMaterial({ color: 0xffffcc });
+        const windowSize = 1.5;
+        
+        for (let floor = 0; floor < Math.floor(height / 4); floor++) {
+            for (let w = 0; w < Math.floor(width / 3); w++) {
+                // Ön pencereler
+                const window1 = new THREE.Mesh(
+                    new THREE.PlaneGeometry(windowSize, windowSize),
+                    windowMaterial
+                );
+                window1.position.set(
+                    x - width/2 + 2 + w * 3,
+                    3 + floor * 4,
+                    z + depth/2 + 0.1
+                );
+                this.scene.add(window1);
+            }
+        }
         
         // Fizik
         const buildingShape = new CANNON.Box(new CANNON.Vec3(width / 2, height / 2, depth / 2));
@@ -306,88 +319,63 @@ class GameMap {
         const group = new THREE.Group();
         
         // Direk
-        const poleGeometry = new THREE.CylinderGeometry(0.2, 0.2, 8, 8);
-        const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
-        const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-        pole.position.y = 4;
+        const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.15, 0.2, 7, 6),
+            new THREE.MeshLambertMaterial({ color: 0x333333 })
+        );
+        pole.position.y = 3.5;
         pole.castShadow = true;
         group.add(pole);
         
-        // Lamba
-        const lightGeometry = new THREE.SphereGeometry(0.5, 8, 8);
-        const lightMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0xffffaa,
-            emissive: 0xffffaa,
-            emissiveIntensity: 0.5
-        });
-        const light = new THREE.Mesh(lightGeometry, lightMaterial);
-        light.position.y = 8;
-        group.add(light);
+        // Lamba kutusu
+        const lampBox = new THREE.Mesh(
+            new THREE.BoxGeometry(0.8, 0.4, 0.8),
+            new THREE.MeshLambertMaterial({ color: 0x222222 })
+        );
+        lampBox.position.y = 7;
+        group.add(lampBox);
         
-        // Işık kaynağı
-        const pointLight = new THREE.PointLight(0xffffaa, 0.5, 30);
-        pointLight.position.y = 8;
-        pointLight.castShadow = true;
-        group.add(pointLight);
+        // Lamba ışığı (sadece mesh, PointLight yok - performans için)
+        const lamp = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 8, 6),
+            new THREE.MeshBasicMaterial({ color: 0xffffaa })
+        );
+        lamp.position.y = 6.7;
+        group.add(lamp);
         
         group.position.set(x, 0, z);
         this.scene.add(group);
     }
     
-    createSign(x, z) {
-        const group = new THREE.Group();
+    createBarriers() {
+        const barrierMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
         
-        // Direk
-        const poleGeometry = new THREE.CylinderGeometry(0.1, 0.1, 3, 8);
-        const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
-        const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-        pole.position.y = 1.5;
-        group.add(pole);
-        
-        // Tabela
-        const signGeometry = new THREE.BoxGeometry(2, 1.5, 0.1);
-        const signMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-        const sign = new THREE.Mesh(signGeometry, signMaterial);
-        sign.position.y = 3.5;
-        sign.castShadow = true;
-        group.add(sign);
-        
-        group.position.set(x, 0, z);
-        group.rotation.y = Math.random() * Math.PI * 2;
-        this.scene.add(group);
+        // Yol kenarı bariyerleri
+        for (let i = -700; i <= 700; i += 30) {
+            // Kuzey-Güney yolu
+            if (Math.abs(i) > 60) {
+                const barrier1 = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5, 1, 10),
+                    barrierMaterial
+                );
+                barrier1.position.set(12, 0.5, i);
+                this.scene.add(barrier1);
+                
+                const barrier2 = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5, 1, 10),
+                    barrierMaterial
+                );
+                barrier2.position.set(-12, 0.5, i);
+                this.scene.add(barrier2);
+            }
+        }
     }
     
     createSkybox() {
         // Gökyüzü küresi
         const skyGeometry = new THREE.SphereGeometry(1500, 32, 32);
-        
-        // Gradient gökyüzü
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-        gradient.addColorStop(0, '#87CEEB');  // Açık mavi
-        gradient.addColorStop(0.5, '#B0E0E6'); // Orta mavi
-        gradient.addColorStop(1, '#F0F8FF');   // Beyazımsı
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Bulutlar
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        for (let i = 0; i < 20; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 256;
-            ctx.beginPath();
-            ctx.ellipse(x, y, 40 + Math.random() * 40, 20 + Math.random() * 20, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        const skyTexture = new THREE.CanvasTexture(canvas);
         const skyMaterial = new THREE.MeshBasicMaterial({ 
-            map: skyTexture,
+            color: 0x87CEEB,
             side: THREE.BackSide
         });
         
@@ -395,67 +383,13 @@ class GameMap {
         this.scene.add(sky);
     }
     
-    setupLighting() {
-        // Güneş ışığı
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-        sunLight.position.set(100, 200, 100);
-        sunLight.castShadow = true;
-        
-        // Gölge ayarları
-        sunLight.shadow.camera.left = -200;
-        sunLight.shadow.camera.right = 200;
-        sunLight.shadow.camera.top = 200;
-        sunLight.shadow.camera.bottom = -200;
-        sunLight.shadow.camera.near = 0.5;
-        sunLight.shadow.camera.far = 500;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
-        
-        this.scene.add(sunLight);
-        this.sunLight = sunLight;
-        
-        // Ortam ışığı
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-        this.scene.add(ambientLight);
-        
-        // Hemisfer ışığı (gökyüzü-zemin)
-        const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x2d5016, 0.3);
-        this.scene.add(hemiLight);
-    }
-    
-    updateDayNightCycle(time) {
-        // time: 0-24 saat
-        const hour = time % 24;
-        
-        // Güneş pozisyonu
-        const sunAngle = (hour / 24) * Math.PI * 2 - Math.PI / 2;
-        const sunDistance = 200;
-        
-        this.sunLight.position.x = Math.cos(sunAngle) * sunDistance;
-        this.sunLight.position.y = Math.sin(sunAngle) * sunDistance;
-        
-        // Işık yoğunluğu
-        if (hour >= 6 && hour <= 18) {
-            // Gündüz
-            const intensity = Math.sin((hour - 6) / 12 * Math.PI);
-            this.sunLight.intensity = 0.5 + intensity * 0.5;
-        } else {
-            // Gece
-            this.sunLight.intensity = 0.1;
-        }
-    }
-    
     getSpawnPoints() {
         return [
-            { x: 0, y: 2, z: 0 },
-            { x: 10, y: 2, z: 0 },
-            { x: -10, y: 2, z: 0 },
-            { x: 0, y: 2, z: 10 },
-            { x: 0, y: 2, z: -10 },
-            { x: 20, y: 2, z: 0 },
-            { x: -20, y: 2, z: 0 },
-            { x: 0, y: 2, z: 20 }
+            { x: 0, y: 2, z: 50 },
+            { x: 10, y: 2, z: 50 },
+            { x: -10, y: 2, z: 50 },
+            { x: 50, y: 2, z: 0 },
+            { x: -50, y: 2, z: 0 }
         ];
     }
 }
-
