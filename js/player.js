@@ -347,16 +347,29 @@ class Player {
             }
         }
         
-        // Dönüş
-        const turnSpeed = 3.0 * this.carData.stats.handling;
-        if (speed > 1) {
+        // Dönüş - hıza bağlı ve gerçekçi
+        const baseTurnSpeed = 2.5 * this.carData.stats.handling;
+        // Düşük hızda daha hızlı dön, yüksek hızda daha yavaş
+        const speedFactor = Math.max(0.3, 1 - (speed / maxSpeed) * 0.5);
+        const turnSpeed = baseTurnSpeed * speedFactor;
+        
+        // Hedef eğilme açısı
+        let targetTilt = 0;
+        
+        if (speed > 0.5) {
             if (this.controls.left) {
                 this.mesh.rotation.y += turnSpeed * delta;
+                targetTilt = 0.15; // Sola eğil
             }
             if (this.controls.right) {
                 this.mesh.rotation.y -= turnSpeed * delta;
+                targetTilt = -0.15; // Sağa eğil
             }
         }
+        
+        // Yumuşak eğilme animasyonu
+        if (!this.currentTilt) this.currentTilt = 0;
+        this.currentTilt += (targetTilt - this.currentTilt) * 0.1;
         
         // Fren
         if (this.controls.brake) {
@@ -394,7 +407,8 @@ class Player {
         
         // Mesh pozisyonunu güncelle
         this.mesh.position.copy(this.body.position);
-        this.mesh.quaternion.setFromEuler(new THREE.Euler(0, this.mesh.rotation.y, 0));
+        // Dönüşte eğilme efekti ekle
+        this.mesh.quaternion.setFromEuler(new THREE.Euler(0, this.mesh.rotation.y, this.currentTilt || 0));
     }
     
     getSpeed() {
