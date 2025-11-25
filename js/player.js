@@ -1,42 +1,38 @@
 /**
  * player.js
- * Oyuncu arabası kontrolü ve fiziği
+ * Oyuncu arabası kontrolü ve fiziği - Gerçekçi sürüş + Yakıt sistemi
  */
 
 class Player {
-    constructor(scene, physicsWorld, carData, spawnPosition = { x: 0, y: 5, z: 0 }) {
+    constructor(scene, physicsWorld, carData, spawnPosition = { x: 5, y: 1, z: 50 }) {
         this.scene = scene;
         this.physicsWorld = physicsWorld;
         this.carData = carData;
         
-        // Önce basit mesh oluştur (placeholder)
+        // Mesh oluştur
         this.mesh = createCarMesh(carData);
         this.mesh.position.set(spawnPosition.x, spawnPosition.y, spawnPosition.z);
         scene.add(this.mesh);
         
-        // GLB varsa yükle ve değiştir
+        // GLB varsa yükle
         if (carData.modelUrl) {
             loadGLBModel(carData.modelUrl, carData, (model) => {
-                // Eski mesh'i kaldır
                 scene.remove(this.mesh);
-                // Yeni mesh'i ekle
                 this.mesh = model;
                 this.mesh.position.copy(this.body.position);
-                this.mesh.quaternion.copy(this.body.quaternion);
                 scene.add(this.mesh);
             });
         }
         
         // Fizik gövdesi
-        const shape = new CANNON.Box(new CANNON.Vec3(1, 0.4, 2));
+        const shape = new CANNON.Box(new CANNON.Vec3(1, 0.5, 2.2));
         this.body = new CANNON.Body({
-            mass: 100, // Hafif - kolay hareket
+            mass: carData.stats.weight / 10,
             shape: shape,
             position: new CANNON.Vec3(spawnPosition.x, spawnPosition.y, spawnPosition.z),
-            linearDamping: 0.01, // Çok düşük
-            angularDamping: 0.5
+            linearDamping: 0.1,
+            angularDamping: 0.9
         });
-        
         physicsWorld.addBody(this.body, null);
         
         // Kontroller
@@ -49,12 +45,28 @@ class Player {
             nitro: false
         };
         
-        // Durum
-        this.speed = 0;
+        // Araba durumu
+        this.rotationY = 0;
+        this.currentSpeed = 0;
         this.nitro = 100;
         this.isDrifting = false;
-        this.wheelRotation = 0;
         this.steerAngle = 0;
+        this.currentTilt = 0;
+        
+        // Yakıt sistemi
+        this.fuel = 100; // Yüzde olarak
+        this.maxFuel = 100;
+        this.fuelConsumption = 0.5; // Saniyede tüketim (gaz basılıyken)
+        
+        // Vites sistemi
+        this.currentGear = 1;
+        this.rpm = 1000;
+        this.clutch = false;
+        this.gearRatios = [0, 3.2, 2.2, 1.6, 1.2, 0.9, 0.7];
+        this.maxRPM = 8000;
+        this.idleRPM = 1000;
+        this.shiftRPM = 6800;
+        this.lastShiftTime = 0;
         
         // Drift partikülleri
         this.driftParticles = [];
@@ -66,355 +78,268 @@ class Player {
     setupControls() {
         window.addEventListener('keydown', (e) => {
             switch(e.key.toLowerCase()) {
-                case 'w':
-                case 'arrowup':
-                    this.controls.forward = true;
-                    break;
-                case 's':
-                case 'arrowdown':
-                    this.controls.backward = true;
-                    break;
-                case 'a':
-                case 'arrowleft':
-                    this.controls.left = true;
-                    break;
-                case 'd':
-                case 'arrowright':
-                    this.controls.right = true;
-                    break;
-                case ' ':
-                    this.controls.brake = true;
-                    e.preventDefault();
-                    break;
-                case 'shift':
-                    this.controls.nitro = true;
-                    break;
+                case 'w': case 'arrowup': this.controls.forward = true; break;
+                case 's': case 'arrowdown': this.controls.backward = true; break;
+                case 'a': case 'arrowleft': this.controls.left = true; break;
+                case 'd': case 'arrowright': this.controls.right = true; break;
+                case ' ': this.controls.brake = true; e.preventDefault(); break;
+                case 'shift': this.controls.nitro = true; break;
             }
         });
         
         window.addEventListener('keyup', (e) => {
             switch(e.key.toLowerCase()) {
-                case 'w':
-                case 'arrowup':
-                    this.controls.forward = false;
-                    break;
-                case 's':
-                case 'arrowdown':
-                    this.controls.backward = false;
-                    break;
-                case 'a':
-                case 'arrowleft':
-                    this.controls.left = false;
-                    break;
-                case 'd':
-                case 'arrowright':
-                    this.controls.right = false;
-                    break;
-                case ' ':
-                    this.controls.brake = false;
-                    break;
-                case 'shift':
-                    this.controls.nitro = false;
-                    break;
+                case 'w': case 'arrowup': this.controls.forward = false; break;
+                case 's': case 'arrowdown': this.controls.backward = false; break;
+                case 'a': case 'arrowleft': this.controls.left = false; break;
+                case 'd': case 'arrowright': this.controls.right = false; break;
+                case ' ': this.controls.brake = false; break;
+                case 'shift': this.controls.nitro = false; break;
             }
         });
     }
     
     setupDriftParticles() {
-        const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+        const particleGeometry = new THREE.SphereGeometry(0.15, 6, 6);
         const particleMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xaaaaaa,
-            transparent: true,
-            opacity: 0.6
+            color: 0x888888, transparent: true, opacity: 0.5
         });
         
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 30; i++) {
             const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone());
             particle.visible = false;
             this.scene.add(particle);
-            this.driftParticles.push({
-                mesh: particle,
-                life: 0,
-                velocity: new THREE.Vector3()
-            });
+            this.driftParticles.push({ mesh: particle, life: 0, velocity: new THREE.Vector3() });
         }
     }
     
-    update(deltaTime) {
+    update(delta) {
+        if (!this.body || !this.mesh) return;
+        
         const stats = this.carData.stats;
+        const maxSpeedKmh = stats.maxSpeed;
+        const maxSpeedMs = maxSpeedKmh / 3.6;
         
-        // Hız hesaplama
-        const velocity = this.body.velocity;
-        this.speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z) * 3.6; // km/h
+        // Mevcut hız (m/s)
+        const velX = this.body.velocity.x;
+        const velZ = this.body.velocity.z;
+        this.currentSpeed = Math.sqrt(velX * velX + velZ * velZ);
+        const speedKmh = this.currentSpeed * 3.6;
         
-        // İleri/Geri hareket
-        const forward = new CANNON.Vec3();
-        this.body.quaternion.vmult(new CANNON.Vec3(0, 0, 1), forward);
+        // Yön vektörleri
+        const forwardX = Math.sin(this.rotationY);
+        const forwardZ = Math.cos(this.rotationY);
         
-        if (this.controls.forward) {
-            const force = stats.acceleration * 5000;
-            const nitroMultiplier = (this.controls.nitro && this.nitro > 0) ? 1.5 : 1;
-            this.body.applyForce(
-                new CANNON.Vec3(forward.x * force * nitroMultiplier, 0, forward.z * force * nitroMultiplier),
-                this.body.position
-            );
+        // Yakıt kontrolü - yakıt yoksa hareket etme
+        const hasFuel = this.fuel > 0;
+        
+        // === VİTES SİSTEMİ ===
+        this.updateGearbox(delta, speedKmh);
+        
+        // === HIZLANMA - Düzeltilmiş ===
+        if (this.controls.forward && !this.clutch && hasFuel) {
+            // Vites çarpanı - düşük viteste daha fazla tork
+            const gearPower = this.gearRatios[Math.max(1, this.currentGear)] || 1;
             
+            // Temel ivme
+            const baseAccel = stats.acceleration * 50; // Artırıldı
+            
+            // RPM bazlı güç eğrisi
+            const rpmRatio = this.rpm / this.maxRPM;
+            const powerCurve = Math.sin(rpmRatio * Math.PI * 0.9); // Güç eğrisi
+            
+            // Toplam ivme
+            let accelForce = baseAccel * gearPower * Math.max(0.3, powerCurve) * delta;
+            
+            // Nitro boost
             if (this.controls.nitro && this.nitro > 0) {
-                this.nitro -= deltaTime * 20;
-                if (this.nitro < 0) this.nitro = 0;
+                accelForce *= 1.5;
+                this.nitro -= delta * 15;
             }
+            
+            // Hız limitine yaklaştıkça direnç
+            const speedRatio = speedKmh / maxSpeedKmh;
+            const airResistance = 1 - (speedRatio * speedRatio * 0.8);
+            
+            this.body.velocity.x += forwardX * accelForce * Math.max(0.1, airResistance);
+            this.body.velocity.z += forwardZ * accelForce * Math.max(0.1, airResistance);
+            
+            // RPM artır
+            this.rpm = Math.min(this.rpm + 4000 * delta, this.maxRPM);
+            
+            // Yakıt tüket
+            this.fuel -= this.fuelConsumption * delta;
+            if (this.fuel < 0) this.fuel = 0;
+        } else {
+            // RPM düşür
+            this.rpm = Math.max(this.rpm - 3000 * delta, this.idleRPM);
         }
         
-        if (this.controls.backward) {
-            const force = stats.acceleration * 3000;
-            this.body.applyForce(
-                new CANNON.Vec3(-forward.x * force, 0, -forward.z * force),
-                this.body.position
-            );
+        // Geri vites
+        if (this.controls.backward && hasFuel) {
+            const reverseAccel = stats.acceleration * 20 * delta;
+            if (speedKmh < 30) {
+                this.body.velocity.x -= forwardX * reverseAccel;
+                this.body.velocity.z -= forwardZ * reverseAccel;
+                this.fuel -= this.fuelConsumption * 0.5 * delta;
+            }
+            this.currentGear = -1;
         }
         
         // Nitro yenileme
         if (!this.controls.nitro && this.nitro < 100) {
-            this.nitro += deltaTime * 10;
-            if (this.nitro > 100) this.nitro = 100;
+            this.nitro = Math.min(this.nitro + delta * 5, 100);
         }
         
-        // Direksiyon
-        const maxSteerAngle = 0.5;
-        const steerSpeed = 3;
+        // === DİREKSİYON ===
+        const baseTurnSpeed = 2.5 * stats.handling;
+        const speedTurnFactor = Math.max(0.4, 1 - (speedKmh / maxSpeedKmh) * 0.5);
+        const turnSpeed = baseTurnSpeed * speedTurnFactor;
         
-        if (this.controls.left) {
-            this.steerAngle = Math.min(this.steerAngle + steerSpeed * deltaTime, maxSteerAngle);
-        } else if (this.controls.right) {
-            this.steerAngle = Math.max(this.steerAngle - steerSpeed * deltaTime, -maxSteerAngle);
-        } else {
-            this.steerAngle *= 0.9;
+        let targetTilt = 0;
+        
+        if (this.currentSpeed > 0.3) {
+            if (this.controls.left) {
+                this.rotationY += turnSpeed * delta;
+                this.steerAngle = Math.min(this.steerAngle + 4 * delta, 0.5);
+                targetTilt = 0.08;
+            } else if (this.controls.right) {
+                this.rotationY -= turnSpeed * delta;
+                this.steerAngle = Math.max(this.steerAngle - 4 * delta, -0.5);
+                targetTilt = -0.08;
+            } else {
+                this.steerAngle *= 0.9;
+            }
         }
         
-        // Dönüş kuvveti
-        if (this.speed > 5) {
-            const turnForce = this.steerAngle * stats.handling * 2000;
-            const right = new CANNON.Vec3();
-            this.body.quaternion.vmult(new CANNON.Vec3(1, 0, 0), right);
-            this.body.applyForce(
-                new CANNON.Vec3(right.x * turnForce, 0, right.z * turnForce),
-                new CANNON.Vec3(this.body.position.x, this.body.position.y, this.body.position.z + 1)
-            );
-        }
+        this.currentTilt += (targetTilt - this.currentTilt) * 0.15;
         
-        // Fren
+        // === FREN ===
         if (this.controls.brake) {
-            this.body.velocity.scale(0.95, this.body.velocity);
-            this.body.angularVelocity.scale(0.9, this.body.angularVelocity);
+            const brakePower = stats.braking * 0.06;
+            this.body.velocity.x *= (1 - brakePower);
+            this.body.velocity.z *= (1 - brakePower);
         }
         
-        // Hız limiti
-        const maxSpeed = stats.maxSpeed / 3.6;
-        const currentSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
-        if (currentSpeed > maxSpeed) {
-            const scale = maxSpeed / currentSpeed;
-            this.body.velocity.x *= scale;
-            this.body.velocity.z *= scale;
+        // === DOĞAL YAVAŞLAMA ===
+        if (!this.controls.forward && !this.controls.backward) {
+            this.body.velocity.x *= 0.998;
+            this.body.velocity.z *= 0.998;
         }
         
-        // Devrilme önleme
-        const upVector = new CANNON.Vec3(0, 1, 0);
-        const bodyUp = new CANNON.Vec3();
-        this.body.quaternion.vmult(upVector, bodyUp);
-        const uprightTorque = 5000;
-        
-        this.body.angularVelocity.x *= 0.95;
-        this.body.angularVelocity.z *= 0.95;
-        
-        if (bodyUp.y < 0.7) {
-            const correctionTorque = new CANNON.Vec3(
-                -this.body.quaternion.x * uprightTorque,
-                0,
-                -this.body.quaternion.z * uprightTorque
-            );
-            this.body.torque.vadd(correctionTorque, this.body.torque);
+        // === HIZ LİMİTİ ===
+        const actualMaxSpeed = (this.controls.nitro && this.nitro > 0) ? maxSpeedMs * 1.15 : maxSpeedMs;
+        if (this.currentSpeed > actualMaxSpeed) {
+            const ratio = actualMaxSpeed / this.currentSpeed;
+            this.body.velocity.x *= ratio;
+            this.body.velocity.z *= ratio;
         }
         
-        // Tekerlek animasyonu
+        // === FİZİK GÜNCELLEME ===
+        this.body.quaternion.setFromEuler(0, this.rotationY, 0);
+        this.body.angularVelocity.set(0, 0, 0);
+        
+        if (this.body.position.y < 0.5) {
+            this.body.position.y = 0.5;
+            this.body.velocity.y = 0;
+        }
+        
+        // === MESH GÜNCELLEME ===
+        this.mesh.position.copy(this.body.position);
+        this.mesh.rotation.set(0, this.rotationY, this.currentTilt);
+        
+        // === DRİFT ===
+        this.isDrifting = Math.abs(this.steerAngle) > 0.3 && speedKmh > 50;
+        this.updateDriftParticles(delta);
+        
+        // === TEKERLEK ANİMASYONU ===
         if (this.mesh.wheels) {
-            const wheelSpeed = this.speed * 0.1;
-            this.wheelRotation += wheelSpeed * deltaTime;
-            
-            this.mesh.wheels.forEach((wheel, index) => {
+            const wheelSpeed = this.currentSpeed * 2;
+            this.wheelRotation = (this.wheelRotation || 0) + wheelSpeed * delta;
+            this.mesh.wheels.forEach((wheel, i) => {
                 wheel.rotation.x = this.wheelRotation;
-                
-                // Ön tekerlekler direksiyon
-                if (index < 2) {
-                    wheel.rotation.y = this.steerAngle;
-                }
+                if (i < 2) wheel.rotation.y = this.steerAngle;
             });
         }
-        
-        // Drift partikülleri
-        this.isDrifting = Math.abs(this.steerAngle) > 0.3 && this.speed > 30;
-        this.updateDriftParticles(deltaTime);
     }
     
-    updateDriftParticles(deltaTime) {
-        this.driftParticles.forEach(particle => {
-            if (particle.life > 0) {
-                particle.life -= deltaTime;
-                particle.mesh.position.add(particle.velocity.clone().multiplyScalar(deltaTime));
-                particle.mesh.material.opacity = particle.life / 0.5;
-                particle.mesh.visible = true;
+    updateGearbox(delta, speedKmh) {
+        const now = Date.now();
+        if (now - this.lastShiftTime < 250) return;
+        
+        if (this.controls.backward) {
+            this.currentGear = -1;
+            return;
+        }
+        
+        // Her vites için hız aralıkları
+        const gearMaxSpeeds = [0, 35, 60, 95, 130, 165, 220];
+        
+        // Vites yükselt
+        if (this.rpm > this.shiftRPM && this.currentGear < 6 && this.currentGear > 0) {
+            this.currentGear++;
+            this.rpm = 4000;
+            this.lastShiftTime = now;
+            this.clutch = true;
+            setTimeout(() => this.clutch = false, 80);
+        }
+        
+        // Vites düşür
+        if (this.currentGear > 1) {
+            const lowerGearMax = gearMaxSpeeds[this.currentGear - 1];
+            if (speedKmh < lowerGearMax * 0.6) {
+                this.currentGear--;
+                this.rpm = 5500;
+                this.lastShiftTime = now;
+            }
+        }
+        
+        // Duruyorsa 1. vites
+        if (speedKmh < 3 && this.currentGear !== 1 && this.currentGear !== -1) {
+            this.currentGear = 1;
+            this.rpm = this.idleRPM;
+        }
+    }
+    
+    refuel(amount) {
+        this.fuel = Math.min(this.fuel + amount, this.maxFuel);
+    }
+    
+    updateDriftParticles(delta) {
+        this.driftParticles.forEach(p => {
+            if (p.life > 0) {
+                p.life -= delta;
+                p.mesh.position.add(p.velocity.clone().multiplyScalar(delta));
+                p.mesh.material.opacity = p.life * 0.8;
+                p.mesh.visible = true;
             } else {
-                particle.mesh.visible = false;
+                p.mesh.visible = false;
             }
         });
         
-        if (this.isDrifting && Math.random() > 0.7) {
-            const availableParticle = this.driftParticles.find(p => p.life <= 0);
-            if (availableParticle) {
-                const offset = new THREE.Vector3(
-                    (Math.random() - 0.5) * 2,
-                    0.1,
-                    -2
-                );
-                offset.applyQuaternion(this.mesh.quaternion);
-                
-                availableParticle.mesh.position.copy(this.mesh.position).add(offset);
-                availableParticle.life = 0.5;
-                availableParticle.velocity.set(
-                    (Math.random() - 0.5) * 2,
-                    Math.random() * 0.5,
-                    (Math.random() - 0.5) * 2
-                );
+        if (this.isDrifting && Math.random() > 0.6) {
+            const available = this.driftParticles.find(p => p.life <= 0);
+            if (available) {
+                const offset = new THREE.Vector3((Math.random() - 0.5) * 1.5, 0.1, -2);
+                offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotationY);
+                available.mesh.position.copy(this.mesh.position).add(offset);
+                available.life = 0.6;
+                available.velocity.set((Math.random() - 0.5), 0.3, (Math.random() - 0.5));
             }
         }
     }
     
-    getPosition() {
-        return {
-            x: this.body.position.x,
-            y: this.body.position.y,
-            z: this.body.position.z
-        };
+    getSpeed() {
+        return this.currentSpeed * 3.6;
     }
     
-    getRotation() {
-        return {
-            x: this.body.quaternion.x,
-            y: this.body.quaternion.y,
-            z: this.body.quaternion.z,
-            w: this.body.quaternion.w
-        };
+    getPosition() {
+        return { x: this.body.position.x, y: this.body.position.y, z: this.body.position.z };
     }
     
     destroy() {
         this.scene.remove(this.mesh);
         this.physicsWorld.removeBody(this.body);
         this.driftParticles.forEach(p => this.scene.remove(p.mesh));
-    }
-    
-    update(delta) {
-        if (!this.body || !this.mesh) return;
-        
-        // Hız hesapla
-        const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.z ** 2);
-        
-        // İvme ayarları - güçlü ivme
-        const acceleration = 200 * this.carData.stats.acceleration;
-        const maxSpeed = this.carData.stats.maxSpeed / 3.6; // km/h -> m/s
-        
-        // Arabanın yönünü al
-        const angle = this.mesh.rotation.y;
-        const forwardX = Math.sin(angle);
-        const forwardZ = Math.cos(angle);
-        
-        // İleri git
-        if (this.controls.forward) {
-            this.body.velocity.x += forwardX * acceleration * delta;
-            this.body.velocity.z += forwardZ * acceleration * delta;
-        }
-        
-        // Debug
-        if (Math.random() < 0.02) {
-            console.log('Pos:', this.body.position.x.toFixed(1), this.body.position.y.toFixed(1), this.body.position.z.toFixed(1), 
-                        'Vel:', this.body.velocity.z.toFixed(1));
-        }
-        
-        // Geri git
-        if (this.controls.backward) {
-            const reverseMaxSpeed = 10; // Geri max 36 km/h
-            if (speed < reverseMaxSpeed) {
-                this.body.velocity.x -= forwardX * acceleration * 0.4 * delta;
-                this.body.velocity.z -= forwardZ * acceleration * 0.4 * delta;
-            }
-        }
-        
-        // Dönüş - hıza bağlı ve gerçekçi
-        const baseTurnSpeed = 2.5 * this.carData.stats.handling;
-        // Düşük hızda daha hızlı dön, yüksek hızda daha yavaş
-        const speedFactor = Math.max(0.3, 1 - (speed / maxSpeed) * 0.5);
-        const turnSpeed = baseTurnSpeed * speedFactor;
-        
-        // Hedef eğilme açısı
-        let targetTilt = 0;
-        
-        if (speed > 0.5) {
-            if (this.controls.left) {
-                this.mesh.rotation.y += turnSpeed * delta;
-                targetTilt = 0.15; // Sola eğil
-            }
-            if (this.controls.right) {
-                this.mesh.rotation.y -= turnSpeed * delta;
-                targetTilt = -0.15; // Sağa eğil
-            }
-        }
-        
-        // Yumuşak eğilme animasyonu
-        if (!this.currentTilt) this.currentTilt = 0;
-        this.currentTilt += (targetTilt - this.currentTilt) * 0.1;
-        
-        // Fren
-        if (this.controls.brake) {
-            this.body.velocity.x *= 0.9;
-            this.body.velocity.z *= 0.9;
-        }
-        
-        // Nitro
-        if (this.controls.nitro && speed > 1) {
-            this.body.velocity.x += forwardX * 100 * delta;
-            this.body.velocity.z += forwardZ * 100 * delta;
-        }
-        
-        // Doğal yavaşlama
-        if (!this.controls.forward && !this.controls.backward) {
-            this.body.velocity.x *= 0.99;
-            this.body.velocity.z *= 0.99;
-        }
-        
-        // Hız limiti (nitro ile biraz aşılabilir)
-        const actualMaxSpeed = this.controls.nitro ? maxSpeed * 1.3 : maxSpeed;
-        if (speed > actualMaxSpeed) {
-            const ratio = actualMaxSpeed / speed;
-            this.body.velocity.x *= ratio;
-            this.body.velocity.z *= ratio;
-        }
-        
-        // Fizik gövdesinin rotasyonunu güncelle
-        this.body.quaternion.setFromEuler(0, this.mesh.rotation.y, 0);
-        
-        // Takla atmasın
-        this.body.angularVelocity.x = 0;
-        this.body.angularVelocity.z = 0;
-        this.body.angularVelocity.y = 0;
-        
-        // Mesh pozisyonunu güncelle
-        this.mesh.position.copy(this.body.position);
-        // Dönüşte eğilme efekti ekle
-        this.mesh.quaternion.setFromEuler(new THREE.Euler(0, this.mesh.rotation.y, this.currentTilt || 0));
-    }
-    
-    getSpeed() {
-        if (!this.body) return 0;
-        const velocity = this.body.velocity;
-        const speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
-        return speed * 3.6; // m/s'den km/h'ye çevir
     }
 }

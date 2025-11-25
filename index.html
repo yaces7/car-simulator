@@ -15,6 +15,7 @@
                 <button class="menu-btn" onclick="showScreen('singlePlayer')">🎮 Tek Oyunculu</button>
                 <button class="menu-btn" onclick="showScreen('multiplayer')">👥 Çok Oyunculu</button>
                 <button class="menu-btn" onclick="showScreen('garage')">🚗 Garaj</button>
+                <button class="menu-btn" onclick="showScreen('stats')">📊 İstatistikler</button>
                 <button class="menu-btn" onclick="showScreen('settings')">⚙️ Ayarlar</button>
             </div>
         </div>
@@ -35,7 +36,9 @@
     <div id="singlePlayer" class="menu-screen">
         <div class="menu-container">
             <h2>Tek Oyunculu Mod</h2>
-            <button class="menu-btn" onclick="startSinglePlayer()">🎮 Başla</button>
+            <button class="menu-btn" onclick="startSinglePlayer('free')">🚗 Serbest Sürüş</button>
+            <button class="menu-btn" onclick="startSinglePlayer('circuit')">🏁 Yarış - Pist</button>
+            <button class="menu-btn" onclick="startSinglePlayer('sprint')">⚡ Yarış - Sprint</button>
             <button class="menu-btn secondary" onclick="showScreen('mainMenu')">⬅️ Geri</button>
         </div>
     </div>
@@ -44,14 +47,56 @@
     <div id="garage" class="menu-screen">
         <div class="menu-container">
             <h2>Garaj - Araç Seçimi</h2>
+            <div class="garage-money">💰 <span id="garageMoney">1000</span></div>
             <div id="carPreview" class="car-preview"></div>
             <div class="car-stats" id="carStats"></div>
             <div class="car-selector">
-                <button class="car-btn" onclick="selectCar(0)">Sedan</button>
-                <button class="car-btn" onclick="selectCar(1)">SUV</button>
-                <button class="car-btn" onclick="selectCar(2)">Sports</button>
-                <button class="car-btn" onclick="selectCar(3)">Muscle</button>
-                <button class="car-btn" onclick="selectCar(4)">Supercar</button>
+                <button class="car-btn" onclick="selectCar(0)" data-price="0">Sedan ✓</button>
+                <button class="car-btn" onclick="selectCar(1)" data-price="2000">SUV 🔒</button>
+                <button class="car-btn" onclick="selectCar(2)" data-price="5000">Sports 🔒</button>
+                <button class="car-btn" onclick="selectCar(3)" data-price="8000">Muscle 🔒</button>
+                <button class="car-btn" onclick="selectCar(4)" data-price="15000">Supercar 🔒</button>
+            </div>
+            <button class="menu-btn buy-btn" id="buyCarBtn" onclick="buyCar()" style="display:none;">🛒 Satın Al</button>
+            <button class="menu-btn secondary" onclick="showScreen('mainMenu')">⬅️ Geri</button>
+        </div>
+    </div>
+
+    <!-- İstatistikler -->
+    <div id="stats" class="menu-screen">
+        <div class="menu-container">
+            <h2>📊 İstatistikler</h2>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-item">
+                    <span class="stat-icon">💰</span>
+                    <span class="stat-label">Toplam Para</span>
+                    <span class="stat-value" id="statMoney">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">⭐</span>
+                    <span class="stat-label">Toplam Skor</span>
+                    <span class="stat-value" id="statScore">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🏎️</span>
+                    <span class="stat-label">En Yüksek Hız</span>
+                    <span class="stat-value" id="statTopSpeed">0 km/h</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🛣️</span>
+                    <span class="stat-label">Toplam Mesafe</span>
+                    <span class="stat-value" id="statDistance">0 km</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🎯</span>
+                    <span class="stat-label">Drift Puanı</span>
+                    <span class="stat-value" id="statDrift">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🏆</span>
+                    <span class="stat-label">Başarımlar</span>
+                    <span class="stat-value" id="statAchievements">0/8</span>
+                </div>
             </div>
             <button class="menu-btn secondary" onclick="showScreen('mainMenu')">⬅️ Geri</button>
         </div>
@@ -61,6 +106,14 @@
     <div id="settings" class="menu-screen">
         <div class="menu-container">
             <h2>Ayarlar</h2>
+            <div class="settings-group">
+                <label>🎮 Kontrol Modu:</label>
+                <select id="controlModeSelect" onchange="setControlMode(this.value)">
+                    <option value="auto">Otomatik</option>
+                    <option value="mobile">📱 Mobil (Dokunmatik)</option>
+                    <option value="desktop">🖥️ Masaüstü (Klavye)</option>
+                </select>
+            </div>
             <div class="settings-group">
                 <label>Grafik Kalitesi:</label>
                 <select id="graphicsQuality" onchange="updateSettings()">
@@ -114,7 +167,34 @@
             <div class="weather-info" id="weatherInfo">☀️ Güneşli</div>
             <div class="time-info" id="timeInfo">12:00</div>
             
+            <!-- Yarış Bilgisi -->
+            <div class="race-info" id="raceInfo" style="display:none;">
+                <div class="race-time">⏱️ <span id="raceTime">0:00.00</span></div>
+                <div class="race-checkpoint">🏁 <span id="raceCheckpoint">0/0</span></div>
+                <div class="race-best">🏆 En İyi: <span id="raceBest">--:--</span></div>
+            </div>
+            
             <button class="pause-btn" onclick="pauseGame()">⏸️</button>
+            <button class="horn-btn" onclick="playHorn()">📯</button>
+            <button class="weather-btn" onclick="cycleWeather()">🌤️</button>
+            <button class="help-btn" onclick="toggleHelp()">❓</button>
+            
+            <!-- Yardım Paneli -->
+            <div class="help-panel" id="helpPanel" style="display:none;">
+                <h3>🎮 Kontroller</h3>
+                <div class="help-row"><span>W / ↑</span> İleri</div>
+                <div class="help-row"><span>S / ↓</span> Geri</div>
+                <div class="help-row"><span>A / ←</span> Sol</div>
+                <div class="help-row"><span>D / →</span> Sağ</div>
+                <div class="help-row"><span>Space</span> Fren</div>
+                <div class="help-row"><span>Shift</span> Nitro</div>
+                <div class="help-row"><span>H</span> Korna</div>
+                <div class="help-row"><span>P</span> Duraklat</div>
+                <div class="help-row"><span>C</span> Kamera Sıfırla</div>
+                <div class="help-row"><span>M</span> Ses Aç/Kapa</div>
+                <div class="help-row"><span>Sağ Tık + Sürükle</span> Kamera Döndür</div>
+                <div class="help-row"><span>Scroll</span> Yakınlaştır/Uzaklaştır</div>
+            </div>
         </div>
         
         <!-- Mobil Kontroller -->
@@ -172,6 +252,9 @@
     <script src="js/ui.js"></script>
     <script src="js/mobileControls.js"></script>
     <script src="js/multiplayer.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/gameManager.js"></script>
+    <script src="js/checkpoint.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
