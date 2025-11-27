@@ -12,9 +12,15 @@ function showScreen(screenId) {
     });
     document.getElementById(screenId).classList.add('active');
     
+    // Garaj canvas kontrolü
     if (screenId === 'garage') {
         initGarage();
-    } else if (screenId === 'stats') {
+    } else {
+        // Garaj değilse canvas'ı gizle
+        if (garagePreview) garagePreview.hide();
+    }
+    
+    if (screenId === 'stats') {
         updateStatsScreen();
     }
 }
@@ -53,11 +59,14 @@ function initGarage() {
         garagePreview.init('carPreview');
     }
     
+    // Garaj canvas'ını göster
+    if (garagePreview) garagePreview.show();
+    
     // Biraz bekle ve arabayı göster
     setTimeout(() => {
         updateCarIndicators();
         selectCar(selectedCarId);
-    }, 300);
+    }, 200);
 }
 
 // Önceki araba
