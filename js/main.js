@@ -43,18 +43,21 @@ function initGarage() {
     // Sahip olunan araçları yükle
     ownedCars = JSON.parse(localStorage.getItem('ownedCars')) || [0];
     
+    // Para göster
+    const money = parseInt(localStorage.getItem('playerMoney')) || 1000;
+    const garageMoney = document.getElementById('garageMoney');
+    if (garageMoney) garageMoney.textContent = money.toLocaleString();
+    
     if (!garagePreview) {
         garagePreview = new GaragePreview();
         garagePreview.init('carPreview');
-        // İlk arabayı göster
-        setTimeout(() => {
-            updateCarIndicators();
-            selectCar(selectedCarId);
-        }, 100);
-    } else {
+    }
+    
+    // Biraz bekle ve arabayı göster
+    setTimeout(() => {
         updateCarIndicators();
         selectCar(selectedCarId);
-    }
+    }, 300);
 }
 
 // Önceki araba
