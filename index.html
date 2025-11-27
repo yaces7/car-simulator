@@ -43,23 +43,63 @@
         </div>
     </div>
 
-    <!-- Garaj -->
-    <div id="garage" class="menu-screen">
-        <div class="menu-container">
-            <h2>Garaj - Araç Seçimi</h2>
-            <div class="garage-money">💰 <span id="garageMoney">1000</span></div>
-            <div id="carPreview" class="car-preview"></div>
-            <div class="car-stats" id="carStats"></div>
-            <div class="car-selector">
-                <button class="car-btn" onclick="selectCar(0)" data-price="0">Sedan ✓</button>
-                <button class="car-btn" onclick="selectCar(1)" data-price="2000">SUV 🔒</button>
-                <button class="car-btn" onclick="selectCar(2)" data-price="5000">Sports 🔒</button>
-                <button class="car-btn" onclick="selectCar(3)" data-price="8000">Muscle 🔒</button>
-                <button class="car-btn" onclick="selectCar(4)" data-price="15000">Supercar 🔒</button>
+    <!-- Garaj - Modern Tasarım -->
+    <div id="garage" class="menu-screen garage-screen">
+        <!-- Sol Panel - Araç Bilgileri -->
+        <div class="garage-left-panel">
+            <button class="back-to-menu-btn" onclick="showScreen('mainMenu')">
+                <span>⬅️</span> Ana Menü
+            </button>
+            
+            <div class="garage-title">
+                <h1>🚗 GARAJ</h1>
+                <div class="garage-money-display">💰 <span id="garageMoney">1000</span></div>
             </div>
-            <button class="menu-btn buy-btn" id="buyCarBtn" onclick="buyCar()" style="display:none;">🛒 Satın Al</button>
-            <button class="menu-btn" onclick="openTuning()">🔧 Tuning</button>
-            <button class="menu-btn secondary" onclick="showScreen('mainMenu')">⬅️ Geri</button>
+            
+            <div class="car-info-panel" id="carInfoPanel">
+                <h2 id="carNameDisplay">Sedan</h2>
+                <div class="car-price-tag" id="carPriceTag">Sahip</div>
+                
+                <div class="car-stats-bars" id="carStats">
+                    <!-- JS ile doldurulacak -->
+                </div>
+            </div>
+            
+            <div class="garage-actions">
+                <button class="garage-action-btn buy-btn" id="buyCarBtn" onclick="buyCar()" style="display:none;">
+                    🛒 SATIN AL
+                </button>
+                <button class="garage-action-btn select-btn" id="selectCarBtn" onclick="confirmCarSelection()">
+                    ✅ SEÇ
+                </button>
+                <button class="garage-action-btn tuning-btn" onclick="openTuning()">
+                    🔧 TUNİNG
+                </button>
+            </div>
+        </div>
+        
+        <!-- Sağ Panel - 3D Önizleme -->
+        <div class="garage-right-panel">
+            <div id="carPreview" class="car-preview-3d"></div>
+            
+            <!-- Ok Butonları -->
+            <button class="car-nav-arrow left-arrow" onclick="prevCar()">
+                <span>❮</span>
+            </button>
+            <button class="car-nav-arrow right-arrow" onclick="nextCar()">
+                <span>❯</span>
+            </button>
+            
+            <!-- Araç İndikatörü -->
+            <div class="car-indicator" id="carIndicator">
+                <span class="indicator-dot active"></span>
+                <span class="indicator-dot"></span>
+                <span class="indicator-dot"></span>
+                <span class="indicator-dot"></span>
+                <span class="indicator-dot"></span>
+                <span class="indicator-dot"></span>
+                <span class="indicator-dot"></span>
+            </div>
         </div>
     </div>
 
@@ -174,6 +214,12 @@
                 <div class="race-checkpoint">🏁 <span id="raceCheckpoint">0/0</span></div>
                 <div class="race-best">🏆 En İyi: <span id="raceBest">--:--</span></div>
             </div>
+            
+            <!-- Kontak Düğmesi -->
+            <button class="ignition-btn" id="ignitionBtn" onclick="toggleIgnition()">
+                <span class="ignition-icon">🔑</span>
+                <span class="ignition-text">KONTAK</span>
+            </button>
             
             <button class="pause-btn" onclick="pauseGame()">⏸️</button>
             <button class="horn-btn" onclick="playHorn()">📯</button>

@@ -27,10 +27,15 @@ class MobileControls {
         // Mobil kontrolleri göster/gizle
         const mobileControls = document.getElementById('mobileControls');
         if (mobileControls) {
+            // Önceki class'ları temizle
+            mobileControls.classList.remove('force-show', 'force-hide');
+            
             if (controlMode === 'mobile') {
+                mobileControls.classList.add('force-show');
                 mobileControls.style.display = 'block';
                 this.active = true;
             } else if (controlMode === 'desktop') {
+                mobileControls.classList.add('force-hide');
                 mobileControls.style.display = 'none';
                 this.active = false;
             } else {
@@ -38,9 +43,17 @@ class MobileControls {
                 if (isMobile || isTouchDevice) {
                     mobileControls.style.display = 'block';
                     this.active = true;
+                } else {
+                    mobileControls.style.display = 'none';
+                    this.active = false;
                 }
             }
             console.log('Kontrol modu:', controlMode, 'Mobil aktif:', this.active);
+        }
+        
+        // Mobil mod seçiliyse her zaman aktif et
+        if (controlMode === 'mobile') {
+            this.active = true;
         }
         
         if (!this.active) return;
@@ -80,8 +93,8 @@ class MobileControls {
             let dx = touch.clientX - startX;
             let dy = touch.clientY - startY;
             
-            // Maksimum mesafe
-            const maxDist = 50;
+            // Maksimum mesafe - BÜYÜTÜLDÜ
+            const maxDist = 65;
             const dist = Math.sqrt(dx * dx + dy * dy);
             
             if (dist > maxDist) {
@@ -93,11 +106,11 @@ class MobileControls {
             // Stick'i hareket ettir
             this.joystickStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
             
-            // Kontrolleri güncelle
+            // Kontrolleri güncelle - daha hassas
             const normalizedX = dx / maxDist;
             if (this.player && this.player.controls) {
-                this.player.controls.left = normalizedX < -0.3;
-                this.player.controls.right = normalizedX > 0.3;
+                this.player.controls.left = normalizedX < -0.25;
+                this.player.controls.right = normalizedX > 0.25;
             }
         };
         

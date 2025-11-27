@@ -58,6 +58,9 @@ class Player {
         this.maxFuel = 100;
         this.fuelConsumption = 0.5;
         
+        // Motor durumu
+        this.engineOn = false;
+        
         // Hasar sistemi
         this.health = 100;
         this.maxHealth = 100;
@@ -250,14 +253,15 @@ class Player {
         const forwardX = Math.sin(this.rotationY);
         const forwardZ = Math.cos(this.rotationY);
         
-        // Yakıt kontrolü - yakıt yoksa hareket etme
+        // Motor ve yakıt kontrolü
         const hasFuel = this.fuel > 0;
+        const canDrive = this.engineOn && hasFuel;
         
         // === VİTES SİSTEMİ ===
         this.updateGearbox(delta, speedKmh);
         
         // === HIZLANMA - Düzeltilmiş ===
-        if (this.controls.forward && !this.clutch && hasFuel) {
+        if (this.controls.forward && !this.clutch && canDrive) {
             // Vites çarpanı - düşük viteste daha fazla tork
             const gearPower = this.gearRatios[Math.max(1, this.currentGear)] || 1;
             
@@ -296,7 +300,7 @@ class Player {
         }
         
         // Geri vites
-        if (this.controls.backward && hasFuel) {
+        if (this.controls.backward && canDrive) {
             const reverseAccel = stats.acceleration * 20 * delta;
             if (speedKmh < 30) {
                 this.body.velocity.x -= forwardX * reverseAccel;

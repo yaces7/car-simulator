@@ -48,69 +48,172 @@ function initGarage() {
         garagePreview.init('carPreview');
         // İlk arabayı göster
         setTimeout(() => {
-            updateCarButtons();
+            updateCarIndicators();
             selectCar(selectedCarId);
         }, 100);
     } else {
-        updateCarButtons();
+        updateCarIndicators();
         selectCar(selectedCarId);
     }
 }
 
+// Önceki araba
+function prevCar() {
+    const totalCars = CAR_MODELS.length;
+    selectedCarId = (selectedCarId - 1 + totalCars) % totalCars;
+    selectCar(selectedCarId);
+}
+
+// Sonraki araba
+function nextCar() {
+    const totalCars = CAR_MODELS.length;
+    selectedCarId = (selectedCarId + 1) % totalCars;
+    selectCar(selectedCarId);
+}
+
+// İndikatörleri güncelle
+function updateCarIndicators() {
+    const indicator = document.getElementById('carIndicator');
+    if (!indicator) return;
+    
+    const dots = indicator.querySelectorAll('.indicator-dot');
+    dots.forEach((dot, index) => {
+        dot.classList.toggle('active', index === selectedCarId);
+        dot.onclick = () => selectCar(index);
+    });
+}
+
+// Araç seçimini onayla
+function confirmCarSelection() {
+    const isOwned = ownedCars.includes(selectedCarId);
+    if (isOwned) {
+        localStorage.setItem('selectedCarId', selectedCarId);
+        if (typeof gameManager !== 'undefined' && gameManager) {
+            gameManager.showNotification(`🚗 ${CAR_MODELS[selectedCarId].name} seçildi!`, 'achievement');
+        }
+    }
+}
+
 // Araç fiyatları
-const CAR_PRICES = [0, 2000, 5000, 8000, 15000];
+const CAR_PRICES = [0, 2000, 5000, 8000, 15000, 12000, 50000];
 
 // Sahip olunan araçlar
 let ownedCars = JSON.parse(localStorage.getItem('ownedCars')) || [0]; // Sedan varsayılan
 
 // Araba seçimi
 function selectCar(carId) {
+    selectedCarId = carId;
     const carData = CAR_MODELS[carId];
     const isOwned = ownedCars.includes(carId);
     const price = CAR_PRICES[carId];
     const playerMoney = parseInt(localStorage.getItem('playerMoney')) || 1000;
     
-    // Aktif butonu işaretle
-    document.querySelectorAll('.car-btn').forEach((btn, index) => {
-        if (index === carId) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
+    // İndikatörleri güncelle
+    updateCarIndicators();
     
+    // 3D önizleme
     if (garagePreview) {
         garagePreview.showCar(carId);
     }
     
-    // İstatistikleri göster
+    // Araç adı
+    const carNameDisplay = document.getElementById('carNameDisplay');
+    if (carNameDisplay) {
+        carNameDisplay.textContent = carData.name;
+    }
+    
+    // Fiyat etiketi
+    const priceTag = document.getElementById('carPriceTag');
+    if (priceTag) {
+        if (isOwned) {
+            priceTag.textContent = '✅ SAHİP';
+            priceTag.className = 'car-price-tag owned';
+        } else {
+            priceTag.textContent = `🔒 ${price.toLocaleString()} 💰`;
+            priceTag.className = 'car-price-tag locked';
+        }
+    }
+    
+    // İstatistik barları
     const statsDiv = document.getElementById('carStats');
     if (statsDiv) {
-        const ownershipStatus = isOwned ? '✅ Sahipsin' : `💰 Fiyat: ${price.toLocaleString()}`;
+        const maxSpeed = 300; // Referans max hız
+        const speedPercent = (carData.stats.maxSpeed / maxSpeed) * 100;
+        const accelPercent = carData.stats.acceleration * 100;
+        const handlingPercent = carData.stats.handling * 100;
+        const brakingPercent = carData.stats.braking * 100;
+        
         statsDiv.innerHTML = `
-            <h3>${carData.name}</h3>
-            <div class="stat ownership-status">${ownershipStatus}</div>
-            <div class="stat">Max Hız: ${carData.stats.maxSpeed} km/h</div>
-            <div class="stat">İvme: ${(carData.stats.acceleration * 100).toFixed(0)}%</div>
-            <div class="stat">Yol Tutuş: ${(carData.stats.handling * 100).toFixed(0)}%</div>
-            <div class="stat">Ağırlık: ${carData.stats.weight} kg</div>
-            <div class="stat">Fren: ${(carData.stats.braking * 100).toFixed(0)}%</div>
+            <div class="stat-bar-item">
+                <div class="stat-bar-label">
+                    <span>🏎️ Hız</span>
+                    <span>${carData.stats.maxSpeed} km/h</span>
+                </div>
+                <div class="stat-bar-bg">
+                    <div class="stat-bar-fill speed" style="width: ${speedPercent}%"></div>
+                </div>
+            </div>
+            <div class="stat-bar-item">
+                <div class="stat-bar-label">
+                    <span>⚡ İvme</span>
+                    <span>${accelPercent.toFixed(0)}%</span>
+                </div>
+                <div class="stat-bar-bg">
+                    <div class="stat-bar-fill accel" style="width: ${accelPercent}%"></div>
+                </div>
+            </div>
+            <div class="stat-bar-item">
+                <div class="stat-bar-label">
+                    <span>🎯 Yol Tutuş</span>
+                    <span>${handlingPercent.toFixed(0)}%</span>
+                </div>
+                <div class="stat-bar-bg">
+                    <div class="stat-bar-fill handling" style="width: ${handlingPercent}%"></div>
+                </div>
+            </div>
+            <div class="stat-bar-item">
+                <div class="stat-bar-label">
+                    <span>🛑 Fren</span>
+                    <span>${brakingPercent.toFixed(0)}%</span>
+                </div>
+                <div class="stat-bar-bg">
+                    <div class="stat-bar-fill braking" style="width: ${brakingPercent}%"></div>
+                </div>
+            </div>
+            <div class="stat-bar-item">
+                <div class="stat-bar-label">
+                    <span>⚖️ Ağırlık</span>
+                    <span>${carData.stats.weight} kg</span>
+                </div>
+            </div>
         `;
     }
     
     // Satın al butonu
     const buyBtn = document.getElementById('buyCarBtn');
+    const selectBtn = document.getElementById('selectCarBtn');
+    
     if (buyBtn) {
         if (isOwned) {
             buyBtn.style.display = 'none';
-            selectedCarId = carId;
-            localStorage.setItem('selectedCarId', carId);
         } else {
             buyBtn.style.display = 'block';
-            buyBtn.textContent = playerMoney >= price ? `🛒 Satın Al (${price.toLocaleString()} 💰)` : `❌ Yetersiz Para (${price.toLocaleString()} 💰)`;
+            buyBtn.innerHTML = playerMoney >= price ? 
+                `🛒 SATIN AL (${price.toLocaleString()} 💰)` : 
+                `❌ YETERSİZ PARA`;
             buyBtn.disabled = playerMoney < price;
             buyBtn.dataset.carId = carId;
             buyBtn.dataset.price = price;
+        }
+    }
+    
+    // Seç butonu
+    if (selectBtn) {
+        if (isOwned) {
+            selectBtn.style.display = 'block';
+            selectBtn.disabled = false;
+        } else {
+            selectBtn.style.display = 'none';
         }
     }
     
@@ -137,25 +240,53 @@ function buyCar() {
         ownedCars.push(carId);
         localStorage.setItem('ownedCars', JSON.stringify(ownedCars));
         
-        // Butonları güncelle
-        updateCarButtons();
-        
-        // Seçimi güncelle
+        // UI güncelle
         selectCar(carId);
         selectedCarId = carId;
         localStorage.setItem('selectedCarId', carId);
         
-        alert(`🎉 ${CAR_MODELS[carId].name} satın alındı!`);
+        // Modern bildirim
+        showPurchaseNotification(CAR_MODELS[carId].name);
     }
 }
 
-// Araç butonlarını güncelle
+// Satın alma bildirimi
+function showPurchaseNotification(carName) {
+    let notification = document.getElementById('purchaseNotification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'purchaseNotification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            padding: 40px 60px;
+            border-radius: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 2000;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            transition: transform 0.3s ease;
+        `;
+        document.body.appendChild(notification);
+    }
+    
+    notification.innerHTML = `🎉 SATIN ALINDI!<br><span style="font-size: 20px;">${carName}</span>`;
+    notification.style.transform = 'translate(-50%, -50%) scale(1)';
+    
+    setTimeout(() => {
+        notification.style.transform = 'translate(-50%, -50%) scale(0)';
+    }, 2000);
+}
+
+// Araç butonlarını güncelle (eski sistem için uyumluluk)
 function updateCarButtons() {
-    document.querySelectorAll('.car-btn').forEach((btn, index) => {
-        const isOwned = ownedCars.includes(index);
-        const carName = CAR_MODELS[index].name;
-        btn.textContent = isOwned ? `${carName} ✓` : `${carName} 🔒`;
-    });
+    // Eski buton sistemi kaldırıldı, indikatörleri güncelle
+    updateCarIndicators();
 }
 
 // Oyun modu
@@ -239,9 +370,14 @@ function initGame() {
         document.getElementById('loadingScreen').classList.remove('active');
         document.getElementById('gameScreen').classList.add('active');
         
-        // Motor sesini başlat
-        if (audioManager) {
-            audioManager.startEngine();
+        // Kontak düğmesini göster ve bildirim
+        const ignitionBtn = document.getElementById('ignitionBtn');
+        if (ignitionBtn) {
+            ignitionBtn.classList.remove('engine-on');
+        }
+        
+        if (gameManager) {
+            gameManager.showNotification('🔑 Motoru çalıştırmak için KONTAK düğmesine basın', '');
         }
     }, 500);
     
@@ -413,8 +549,55 @@ function toggleHelp() {
 
 // Korna çal
 function playHorn() {
-    if (audioManager) {
+    if (audioManager && audioManager.isEngineRunning()) {
         audioManager.playSound('horn');
+    }
+}
+
+// Kontak aç/kapa
+function toggleIgnition() {
+    if (!audioManager) return;
+    
+    const ignitionBtn = document.getElementById('ignitionBtn');
+    
+    if (audioManager.isEngineRunning()) {
+        // Motoru kapat
+        audioManager.stopEngine();
+        if (ignitionBtn) {
+            ignitionBtn.classList.remove('engine-on', 'starting');
+        }
+        
+        // Araba hareket edemez
+        if (player) {
+            player.engineOn = false;
+        }
+        
+        if (gameManager) {
+            gameManager.showNotification('🔑 Motor kapatıldı', '');
+        }
+    } else {
+        // Motoru çalıştır
+        if (ignitionBtn) {
+            ignitionBtn.classList.add('starting');
+        }
+        
+        audioManager.startEngine(false); // false = marş sekansı ile
+        
+        setTimeout(() => {
+            if (ignitionBtn) {
+                ignitionBtn.classList.remove('starting');
+                ignitionBtn.classList.add('engine-on');
+            }
+            
+            // Araba hareket edebilir
+            if (player) {
+                player.engineOn = true;
+            }
+            
+            if (gameManager) {
+                gameManager.showNotification('🚗 Motor çalıştı!', '');
+            }
+        }, 1500);
     }
 }
 
@@ -468,6 +651,49 @@ window.addEventListener('resize', () => {
     }
 });
 
+// Kontrol modunu ayarla
+function setControlMode(mode) {
+    localStorage.setItem('controlMode', mode);
+    
+    const mobileControls = document.getElementById('mobileControls');
+    if (!mobileControls) return;
+    
+    // Tüm force class'larını kaldır
+    mobileControls.classList.remove('force-show', 'force-hide');
+    
+    if (mode === 'mobile') {
+        mobileControls.classList.add('force-show');
+        mobileControls.style.display = 'block';
+        console.log('Mobil kontroller aktif');
+    } else if (mode === 'desktop') {
+        mobileControls.classList.add('force-hide');
+        mobileControls.style.display = 'none';
+        console.log('Masaüstü kontroller aktif');
+    } else {
+        // Auto mod - cihaza göre
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        
+        if (isMobile || isTouchDevice) {
+            mobileControls.style.display = 'block';
+        } else {
+            mobileControls.style.display = 'none';
+        }
+        console.log('Otomatik kontrol modu');
+    }
+    
+    // Bildirim göster
+    const modeNames = {
+        'auto': '🔄 Otomatik',
+        'mobile': '📱 Mobil',
+        'desktop': '🖥️ Masaüstü'
+    };
+    
+    if (typeof gameManager !== 'undefined' && gameManager) {
+        gameManager.showNotification(`Kontrol: ${modeNames[mode]}`, '');
+    }
+}
+
 // Sayfa yüklendiğinde
 window.addEventListener('load', () => {
     console.log('Oyun hazır!');
@@ -476,6 +702,13 @@ window.addEventListener('load', () => {
     const savedCarId = localStorage.getItem('selectedCarId');
     if (savedCarId !== null) {
         selectedCarId = parseInt(savedCarId);
+    }
+    
+    // Kaydedilmiş kontrol modunu yükle
+    const savedControlMode = localStorage.getItem('controlMode') || 'auto';
+    const controlSelect = document.getElementById('controlModeSelect');
+    if (controlSelect) {
+        controlSelect.value = savedControlMode;
     }
 });
 

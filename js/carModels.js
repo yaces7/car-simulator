@@ -73,6 +73,34 @@ const CAR_MODELS = [
         },
         color: 0x9b59b6,
         modelUrl: 'models/supercar.glb'
+    },
+    {
+        id: 5,
+        name: "BMW 733i",
+        type: "luxury",
+        stats: {
+            maxSpeed: 220,
+            acceleration: 0.85,
+            handling: 0.85,
+            weight: 1500,
+            braking: 0.85
+        },
+        color: 0x1a1a2e,
+        modelUrl: 'models/bmw_733i.glb'
+    },
+    {
+        id: 6,
+        name: "Lamborghini",
+        type: "hypercar",
+        stats: {
+            maxSpeed: 320,
+            acceleration: 1.3,
+            handling: 0.95,
+            weight: 1100,
+            braking: 1.1
+        },
+        color: 0xf1c40f,
+        modelUrl: 'models/lamborghini.glb'
     }
 ];
 
