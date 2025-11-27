@@ -347,6 +347,16 @@ class GaragePreview {
         const gridHelper = new THREE.GridHelper(12, 12, 0x4a6a9a, 0x3a4a6a);
         this.scene.add(gridHelper);
         
+        // Test küpü - sahne çalışıyor mu kontrol
+        const testCube = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 1, 1),
+            new THREE.MeshStandardMaterial({ color: 0xff0000 })
+        );
+        testCube.position.set(0, 0.5, 0);
+        testCube.name = 'testCube';
+        this.scene.add(testCube);
+        console.log('Test küpü eklendi');
+        
         this.initialized = true;
         console.log('Garaj sahnesi hazır');
         
