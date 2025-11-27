@@ -639,22 +639,33 @@ class GameMap {
         this.sunLight.position.set(Math.cos(sunAngle) * 200, Math.max(sunHeight * 200, 10), 100);
         
         if (hour >= 6 && hour <= 18) {
+            // Gündüz
             const intensity = 0.5 + Math.sin(sunAngle) * 0.5;
             this.sunLight.intensity = intensity;
             this.ambientLight.intensity = 0.3 + intensity * 0.2;
             
             if (hour < 8 || hour > 16) {
+                // Gün doğumu/batımı
                 this.sunLight.color.setHex(0xffaa55);
                 this.skyMaterial.color.setHex(0xff9966);
+                if (this.scene.fog) this.scene.fog.color.setHex(0xff9966);
             } else {
+                // Öğlen
                 this.sunLight.color.setHex(0xffffff);
                 this.skyMaterial.color.setHex(0x87CEEB);
+                if (this.scene.fog) this.scene.fog.color.setHex(0x87CEEB);
             }
         } else {
-            this.sunLight.intensity = 0.1;
-            this.ambientLight.intensity = 0.15;
-            this.sunLight.color.setHex(0x4444ff);
-            this.skyMaterial.color.setHex(0x0a0a2e);
+            // Gece - çok karanlık
+            this.sunLight.intensity = 0.05;
+            this.ambientLight.intensity = 0.08;
+            this.sunLight.color.setHex(0x2222aa);
+            this.skyMaterial.color.setHex(0x050510);
+            if (this.scene.fog) {
+                this.scene.fog.color.setHex(0x050510);
+                this.scene.fog.near = 20;
+                this.scene.fog.far = 150;
+            }
         }
     }
     

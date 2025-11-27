@@ -67,13 +67,23 @@ class ThirdPersonCamera {
     }
     
     update() {
-        if (!this.target || !this.target.mesh) return;
+        if (!this.target) return;
         
-        const targetPos = this.target.mesh.position;
-        const targetRot = this.target.mesh.rotation;
+        // Pozisyon ve rotasyon al (mesh veya getPosition/getRotation)
+        let targetPos, targetRotY;
+        
+        if (this.target.mesh) {
+            targetPos = this.target.mesh.position;
+            targetRotY = this.target.rotationY || this.target.mesh.rotation.y || 0;
+        } else if (this.target.getPosition) {
+            targetPos = this.target.getPosition();
+            targetRotY = this.target.getRotation ? this.target.getRotation() : 0;
+        } else {
+            return;
+        }
         
         // Hedef kamera pozisyonu
-        const cameraAngle = targetRot.y + this.angle;
+        const cameraAngle = targetRotY + this.angle;
         const targetX = targetPos.x - Math.sin(cameraAngle) * this.distance;
         const targetY = targetPos.y + this.height;
         const targetZ = targetPos.z - Math.cos(cameraAngle) * this.distance;
@@ -83,7 +93,7 @@ class ThirdPersonCamera {
         this.camera.position.y += (targetY - this.camera.position.y) * this.smoothness;
         this.camera.position.z += (targetZ - this.camera.position.z) * this.smoothness;
         
-        // Arabaya bak
+        // Hedefe bak
         this.camera.lookAt(targetPos.x, targetPos.y + 1, targetPos.z);
     }
     

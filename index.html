@@ -215,7 +215,11 @@
                 <div class="race-best">🏆 En İyi: <span id="raceBest">--:--</span></div>
             </div>
             
-            <!-- Kontak Düğmesi -->
+            <!-- Kontak ve Far Düğmeleri -->
+            <button class="headlight-btn" id="headlightBtn" onclick="toggleHeadlights()">
+                💡
+                <small>FAR</small>
+            </button>
             <button class="ignition-btn" id="ignitionBtn" onclick="toggleIgnition()">
                 <span class="ignition-icon">🔑</span>
                 <span class="ignition-text">KONTAK</span>
@@ -262,6 +266,10 @@
                     <span>🚀</span>
                     <small>Nitro</small>
                 </button>
+                <button class="action-btn exit-btn" id="exitVehicleBtn" onclick="toggleVehicle()">
+                    <span>🚶</span>
+                    <small>İn/Bin</small>
+                </button>
             </div>
             
             <div class="throttle-container">
@@ -304,6 +312,7 @@
     <script src="js/gameManager.js"></script>
     <script src="js/checkpoint.js"></script>
     <script src="js/police.js"></script>
+    <script src="js/character.js"></script>
     <script src="js/tuning.js"></script>
     <script src="js/main.js"></script>
 </body>

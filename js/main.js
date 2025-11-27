@@ -59,14 +59,14 @@ function initGarage() {
         garagePreview.init('carPreview');
     }
     
-    // Garaj canvas'ını göster
-    if (garagePreview) garagePreview.show();
-    
-    // Biraz bekle ve arabayı göster
+    // Biraz bekle - canvas oluşsun, sonra göster
     setTimeout(() => {
+        if (garagePreview && garagePreview.show) {
+            garagePreview.show();
+        }
         updateCarIndicators();
         selectCar(selectedCarId);
-    }, 200);
+    }, 300);
 }
 
 // Önceki araba
@@ -324,10 +324,9 @@ function startMultiplayer() {
 function initGame() {
     const canvas = document.getElementById('gameCanvas');
     
-    // Three.js sahne
+    // Three.js sahne - background yok, skybox kullanılacak
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB);
-    scene.fog = new THREE.Fog(0x87CEEB, 0, 500);
+    scene.fog = new THREE.Fog(0x87CEEB, 100, 800);
     
     // Renderer
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -404,10 +403,16 @@ function initGame() {
     // Polis sistemi
     policeSystem = new PoliceSystem(scene, physicsWorld.world);
     
+    // Karakter sistemi (GTA tarzı)
+    character = new Character(scene, physicsWorld.world);
+    
     // Tuning sistemi
     if (!tuningSystem) {
         tuningSystem = new TuningSystem();
     }
+    
+    // F tuşu ile arabadan in/bin
+    setupVehicleControls();
     
     // Yarış modu ise checkpoint'leri oluştur
     if (gameMode === 'circuit' || gameMode === 'sprint') {
@@ -443,99 +448,110 @@ function animate() {
         physicsWorld.update(delta);
     }
     
-    // Oyuncu güncelle
-    if (player) {
+    // Karakter güncelle (arabadan inmişse)
+    if (character && !isInVehicle) {
+        character.update(delta);
+    }
+    
+    // Oyuncu güncelle (arabadaysa)
+    if (player && isInVehicle) {
         player.update(delta);
+    }
+    
+    // Aktif hedefin pozisyonunu al
+    const activeTarget = isInVehicle ? player : character;
+    const activePosition = activeTarget ? 
+        (activeTarget.mesh ? activeTarget.mesh.position : activeTarget.getPosition()) : 
+        { x: 0, y: 0, z: 0 };
+    
+    // Harita güncelle (chunk loading + gün/gece)
+    if (gameMap && activePosition) {
+        gameMap.update(activePosition, delta);
         
-        // Harita güncelle (chunk loading + gün/gece)
-        if (gameMap && player.mesh) {
-            gameMap.update(player.mesh.position, delta);
-            
-            // Saat ve hava durumu güncelle
-            const timeInfo = document.getElementById('timeInfo');
-            const weatherInfo = document.getElementById('weatherInfo');
-            if (timeInfo) timeInfo.textContent = gameMap.getTimeString();
-            if (weatherInfo) weatherInfo.textContent = gameMap.getWeatherString();
-        }
+        // Saat ve hava durumu güncelle
+        const timeInfo = document.getElementById('timeInfo');
+        const weatherInfo = document.getElementById('weatherInfo');
+        if (timeInfo) timeInfo.textContent = gameMap.getTimeString();
+        if (weatherInfo) weatherInfo.textContent = gameMap.getWeatherString();
+    }
+    
+    // UI güncelle (sadece arabadayken)
+    if (ui && player && isInVehicle) {
+        const speed = player.getSpeed();
+        ui.updateSpeed(speed);
+        ui.updateGear(player.currentGear || 1);
+        ui.updateRPM(player.rpm || 1000, 8000);
+        ui.updateFuel(player.fuel || 100);
+        ui.updateHealth(player.health || 100);
+        ui.updateMinimap(
+            player.mesh.position,
+            player.rotationY || 0
+        );
+    }
+    
+    // Benzin istasyonu kontrolü
+    if (gameMap && player && player.mesh && isInVehicle) {
+        const nearStation = gameMap.checkGasStationProximity(player.mesh.position);
+        handleGasStation(nearStation);
+    }
+    
+    // Oyun yöneticisi güncelle
+    if (gameManager && player) {
+        gameManager.update(player, gameMap, delta);
+    }
+    
+    // Motor sesi güncelle
+    if (audioManager && audioManager.engineRunning && isInVehicle) {
+        const speed = player.getSpeed();
+        const throttle = player.controls && player.controls.forward;
+        audioManager.updateEngine(speed, throttle, speed * 30);
         
-        // UI güncelle
-        if (ui) {
-            const speed = player.getSpeed();
-            ui.updateSpeed(speed);
-            ui.updateGear(player.currentGear || 1);
-            ui.updateRPM(player.rpm || 1000, 8000);
-            ui.updateFuel(player.fuel || 100);
-            ui.updateHealth(player.health || 100);
-            ui.updateMinimap(
-                player.mesh.position,
-                player.rotationY || 0
-            );
-        }
-        
-        // Benzin istasyonu kontrolü
-        if (gameMap && player.mesh) {
-            const nearStation = gameMap.checkGasStationProximity(player.mesh.position);
-            handleGasStation(nearStation);
-        }
-        
-        // Oyun yöneticisi güncelle
-        if (gameManager) {
-            gameManager.update(player, gameMap, delta);
-        }
-        
-        // Motor sesi güncelle
-        if (audioManager && audioManager.engineRunning) {
-            const speed = player.getSpeed();
-            const throttle = player.controls && player.controls.forward;
-            audioManager.updateEngine(speed, throttle, speed * 30);
-            
-            // Drift sesi
-            if (player.isDrifting && speed > 30) {
-                if (Math.random() < 0.1) {
-                    audioManager.playSound('drift');
-                }
+        // Drift sesi
+        if (player.isDrifting && speed > 30) {
+            if (Math.random() < 0.1) {
+                audioManager.playSound('drift');
             }
-            
-            // Nitro sesi
-            if (player.controls && player.controls.nitro && player.nitro > 0) {
-                if (Math.random() < 0.05) {
-                    audioManager.playSound('nitro');
-                }
-            }
         }
         
-        // Checkpoint sistemi güncelle
-        if (checkpointSystem) {
-            if (checkpointSystem.raceActive) {
-                checkpointSystem.update(player.mesh.position, delta);
-                
-                // Yarış bilgisini göster
-                const raceInfo = checkpointSystem.getRaceInfo();
-                if (raceInfo) {
-                    const raceInfoPanel = document.getElementById('raceInfo');
-                    if (raceInfoPanel) {
-                        raceInfoPanel.style.display = 'block';
-                        document.getElementById('raceTime').textContent = raceInfo.time;
-                        document.getElementById('raceCheckpoint').textContent = raceInfo.checkpoint;
-                        document.getElementById('raceBest').textContent = raceInfo.bestTime;
-                    }
-                }
-            } else {
+        // Nitro sesi
+        if (player.controls && player.controls.nitro && player.nitro > 0) {
+            if (Math.random() < 0.05) {
+                audioManager.playSound('nitro');
+            }
+        }
+    }
+    
+    // Checkpoint sistemi güncelle
+    if (checkpointSystem && isInVehicle) {
+        if (checkpointSystem.raceActive) {
+            checkpointSystem.update(player.mesh.position, delta);
+            
+            // Yarış bilgisini göster
+            const raceInfo = checkpointSystem.getRaceInfo();
+            if (raceInfo) {
                 const raceInfoPanel = document.getElementById('raceInfo');
                 if (raceInfoPanel) {
-                    raceInfoPanel.style.display = 'none';
+                    raceInfoPanel.style.display = 'block';
+                    document.getElementById('raceTime').textContent = raceInfo.time;
+                    document.getElementById('raceCheckpoint').textContent = raceInfo.checkpoint;
+                    document.getElementById('raceBest').textContent = raceInfo.bestTime;
                 }
             }
-        }
-        
-        // Polis sistemi güncelle
-        if (policeSystem) {
-            policeSystem.update(player, delta);
-            
-            // Wanted level UI güncelle
-            if (ui && ui.updateWantedLevel) {
-                ui.updateWantedLevel(policeSystem.getWantedLevel());
+        } else {
+            const raceInfoPanel = document.getElementById('raceInfo');
+            if (raceInfoPanel) {
+                raceInfoPanel.style.display = 'none';
             }
+        }
+    }
+    
+    // Polis sistemi güncelle
+    if (policeSystem && isInVehicle) {
+        policeSystem.update(player, delta);
+        
+        // Wanted level UI güncelle
+        if (ui && ui.updateWantedLevel) {
+            ui.updateWantedLevel(policeSystem.getWantedLevel());
         }
     }
     
@@ -615,6 +631,109 @@ function toggleIgnition() {
                 gameManager.showNotification('🚗 Motor çalıştı!', '');
             }
         }, 1500);
+    }
+}
+
+// Far aç/kapa
+function toggleHeadlights() {
+    if (!player) return;
+    
+    const headlightBtn = document.getElementById('headlightBtn');
+    
+    if (player.toggleHeadlights) {
+        const isOn = player.toggleHeadlights();
+        
+        if (headlightBtn) {
+            headlightBtn.classList.toggle('lights-on', isOn);
+        }
+        
+        if (gameManager) {
+            gameManager.showNotification(isOn ? '💡 Farlar açıldı' : '🌙 Farlar kapatıldı', '');
+        }
+    }
+}
+
+// Arabadan in/bin kontrolleri
+let isInVehicle = true;
+
+function setupVehicleControls() {
+    window.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'e') {
+            toggleVehicle();
+        }
+    });
+}
+
+function toggleVehicle() {
+    if (!character || !player) return;
+    
+    if (isInVehicle) {
+        // Arabadan in
+        exitVehicle();
+    } else {
+        // Arabaya bin
+        enterVehicle();
+    }
+}
+
+function exitVehicle() {
+    if (!isInVehicle || !player || !character) return;
+    
+    // Motor kapalıysa çık
+    if (audioManager && audioManager.isEngineRunning()) {
+        audioManager.stopEngine();
+        const ignitionBtn = document.getElementById('ignitionBtn');
+        if (ignitionBtn) ignitionBtn.classList.remove('engine-on');
+    }
+    
+    // Karakteri arabadan çıkar
+    character.exitVehicle(player.mesh.position, player.rotationY);
+    
+    // Araba kontrollerini devre dışı bırak
+    player.controls = {
+        forward: false, backward: false,
+        left: false, right: false,
+        brake: false, nitro: false
+    };
+    
+    isInVehicle = false;
+    
+    // Kamerayı karaktere bağla
+    if (camera) {
+        camera.target = character;
+        camera.distance = 5;
+        camera.height = 2;
+    }
+    
+    if (gameManager) {
+        gameManager.showNotification('🚶 Arabadan indiniz (F ile bin)', '');
+    }
+}
+
+function enterVehicle() {
+    if (isInVehicle || !character || !player) return;
+    
+    // Yakında araba var mı?
+    const nearbyVehicle = character.findNearbyVehicle([player]);
+    
+    if (nearbyVehicle) {
+        character.enterVehicle();
+        isInVehicle = true;
+        
+        // Kamerayı arabaya bağla
+        if (camera) {
+            camera.target = player;
+            camera.distance = 8;
+            camera.height = 3;
+        }
+        
+        if (gameManager) {
+            gameManager.showNotification('🚗 Arabaya bindiniz (F ile in)', '');
+        }
+    } else {
+        if (gameManager) {
+            gameManager.showNotification('❌ Yakında araba yok!', '');
+        }
     }
 }
 
