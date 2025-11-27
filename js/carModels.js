@@ -113,31 +113,32 @@ function loadGLBModel(url, carData, callback) {
     loader.load(
         url,
         (gltf) => {
-            // Model yüklendi
             const model = gltf.scene;
             
-            // Bounding box hesapla
+            // Önce ölçekle
             const box = new THREE.Box3().setFromObject(model);
             const size = box.getSize(new THREE.Vector3());
-            const center = box.getCenter(new THREE.Vector3());
-            
-            // Wrapper group oluştur
-            const wrapper = new THREE.Group();
-            
-            // Modeli merkeze al
-            model.position.x = -center.x;
-            model.position.y = -box.min.y; // Zeminde olsun
-            model.position.z = -center.z;
-            
-            // Otomatik ölçeklendirme - hedef boyut 4 birim (araba boyutu)
             const maxDim = Math.max(size.x, size.y, size.z);
+            
+            // Hedef boyut 4 birim
             const targetSize = 4;
-            const scale = targetSize / maxDim;
+            const scale = maxDim > 0 ? targetSize / maxDim : 1;
             model.scale.set(scale, scale, scale);
             
+            // Ölçekledikten sonra tekrar bounding box hesapla
+            box.setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            
+            // Wrapper group
+            const wrapper = new THREE.Group();
             wrapper.add(model);
             
-            // Sadece gölge ayarları - materyal değiştirme yok
+            // Modeli merkeze al ve zemine oturt
+            model.position.x = -center.x;
+            model.position.y = -box.min.y + 0.1; // Zeminin biraz üstünde
+            model.position.z = -center.z;
+            
+            // Gölge ayarları
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
@@ -145,17 +146,16 @@ function loadGLBModel(url, carData, callback) {
                 }
             });
             
+            console.log('Model boyutu:', size, 'Scale:', scale);
             callback(wrapper);
         },
         (xhr) => {
-            // Yükleme ilerlemesi
             if (xhr.total > 0) {
                 console.log((xhr.loaded / xhr.total * 100).toFixed(0) + '% yüklendi');
             }
         },
         (error) => {
             console.error('GLB yükleme hatası:', error);
-            // Hata durumunda prosedürel model kullan
             callback(createCarMesh(carData));
         }
     );
