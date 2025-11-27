@@ -373,7 +373,7 @@ function initGame() {
     ui = new UI();
     
     // Mobil kontroller
-    const mobileControls = new MobileControls(player);
+    mobileControlsInstance = new MobileControls(player);
     
     // Oyun yöneticisi (skor, görevler)
     gameManager = new GameManager();
@@ -705,6 +705,12 @@ function exitVehicle() {
         camera.height = 2;
     }
     
+    // Mobil kontrolleri karakter moduna geçir
+    if (mobileControlsInstance) {
+        mobileControlsInstance.setCharacter(character);
+        mobileControlsInstance.setMode('character');
+    }
+    
     if (gameManager) {
         gameManager.showNotification('🚶 Arabadan indiniz (F ile bin)', '');
     }
@@ -725,6 +731,11 @@ function enterVehicle() {
             camera.target = player;
             camera.distance = 8;
             camera.height = 3;
+        }
+        
+        // Mobil kontrolleri araba moduna geçir
+        if (mobileControlsInstance) {
+            mobileControlsInstance.setMode('vehicle');
         }
         
         if (gameManager) {
