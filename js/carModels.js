@@ -261,7 +261,7 @@ function createCarMesh(carData) {
 }
 
 /**
- * Garaj önizleme sahnesi - Overlay Canvas Yaklaşımı
+ * Garaj önizleme sahnesi - Tam Çalışan 3D Sistem
  */
 class GaragePreview {
     constructor() {
@@ -272,10 +272,19 @@ class GaragePreview {
         this.animationId = null;
         this.initialized = false;
         this.canvas = null;
+        this.isVisible = false;
+        this.rotationSpeed = 0.005;
+        this.loadingIndicator = null;
     }
     
     init(containerId) {
         this.containerId = containerId;
+        
+        // Eğer zaten başlatılmışsa tekrar başlatma
+        if (this.initialized && this.renderer) {
+            return;
+        }
+        
         this.setupScene();
     }
     
@@ -285,7 +294,7 @@ class GaragePreview {
             this.canvas.parentNode.removeChild(this.canvas);
         }
         
-        // Yeni canvas oluştur ve body'ye ekle
+        // Yeni canvas oluştur
         this.canvas = document.createElement('canvas');
         this.canvas.id = 'garageCanvas';
         this.canvas.style.cssText = `
@@ -296,6 +305,7 @@ class GaragePreview {
             height: 100vh;
             z-index: 5;
             pointer-events: none;
+            display: none;
         `;
         document.body.appendChild(this.canvas);
         
@@ -304,115 +314,229 @@ class GaragePreview {
         
         // Sahne
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x1a1a2e);
+        
+        // Gradient arka plan
+        const bgColor = new THREE.Color(0x0a0a1a);
+        this.scene.background = bgColor;
+        this.scene.fog = new THREE.Fog(bgColor, 15, 50);
         
         // Kamera
-        this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        this.camera.position.set(7, 4, 7);
-        this.camera.lookAt(0, 1, 0);
+        this.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+        this.camera.position.set(8, 4, 8);
+        this.camera.lookAt(0, 0.5, 0);
         
-        // Renderer - canvas'ı kullan
-        this.renderer = new THREE.WebGLRenderer({ 
-            canvas: this.canvas,
-            antialias: true 
-        });
-        this.renderer.setSize(width, height);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.shadowMap.enabled = true;
+        // Renderer
+        try {
+            this.renderer = new THREE.WebGLRenderer({ 
+                canvas: this.canvas,
+                antialias: true,
+                alpha: false
+            });
+            this.renderer.setSize(width, height);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            this.renderer.shadowMap.enabled = true;
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            this.renderer.outputEncoding = THREE.sRGBEncoding;
+            this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            this.renderer.toneMappingExposure = 1.2;
+        } catch (e) {
+            console.error('WebGL renderer oluşturulamadı:', e);
+            return;
+        }
         
-        // Işıklar
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        // Işıklar - Stüdyo aydınlatması
+        const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
         this.scene.add(ambientLight);
         
+        // Ana ışık (üstten)
         const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        mainLight.position.set(10, 20, 10);
+        mainLight.position.set(5, 15, 5);
         mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 50;
+        mainLight.shadow.camera.left = -10;
+        mainLight.shadow.camera.right = 10;
+        mainLight.shadow.camera.top = 10;
+        mainLight.shadow.camera.bottom = -10;
         this.scene.add(mainLight);
         
-        const backLight = new THREE.DirectionalLight(0x6699ff, 0.8);
-        backLight.position.set(-10, 10, -10);
+        // Dolgu ışığı (önden)
+        const fillLight = new THREE.DirectionalLight(0x8888ff, 0.6);
+        fillLight.position.set(-5, 5, 10);
+        this.scene.add(fillLight);
+        
+        // Arka ışık (rim light)
+        const backLight = new THREE.DirectionalLight(0xff8844, 0.4);
+        backLight.position.set(0, 5, -10);
         this.scene.add(backLight);
         
-        // Zemin
-        const ground = new THREE.Mesh(
-            new THREE.CircleGeometry(20, 64),
-            new THREE.MeshStandardMaterial({ color: 0x2a3a5a, roughness: 0.8 })
-        );
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        this.scene.add(ground);
+        // Spot ışıklar
+        const spotLight1 = new THREE.SpotLight(0x4488ff, 0.8, 30, Math.PI / 6, 0.5);
+        spotLight1.position.set(-8, 8, 0);
+        spotLight1.target.position.set(0, 0, 0);
+        this.scene.add(spotLight1);
+        this.scene.add(spotLight1.target);
+        
+        const spotLight2 = new THREE.SpotLight(0xff4488, 0.8, 30, Math.PI / 6, 0.5);
+        spotLight2.position.set(8, 8, 0);
+        spotLight2.target.position.set(0, 0, 0);
+        this.scene.add(spotLight2);
+        this.scene.add(spotLight2.target);
+        
+        // Zemin - Yansıtıcı platform
+        const platformGeometry = new THREE.CylinderGeometry(8, 8, 0.3, 64);
+        const platformMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x1a1a2e,
+            metalness: 0.9,
+            roughness: 0.1
+        });
+        const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+        platform.position.y = -0.15;
+        platform.receiveShadow = true;
+        this.scene.add(platform);
+        
+        // Platform kenar ışığı
+        const ringGeometry = new THREE.TorusGeometry(8, 0.05, 16, 100);
+        const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x4488ff });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = 0.01;
+        this.scene.add(ring);
         
         // Grid
-        const grid = new THREE.GridHelper(15, 15, 0x4a6a9a, 0x3a4a6a);
-        grid.position.y = 0.01;
-        this.scene.add(grid);
+        const gridHelper = new THREE.GridHelper(16, 32, 0x2a3a5a, 0x1a2a3a);
+        gridHelper.position.y = 0.02;
+        this.scene.add(gridHelper);
         
         this.initialized = true;
-        console.log('Garaj sahnesi hazır - Overlay canvas');
+        console.log('Garaj 3D sahnesi hazır');
         
+        // Animasyon başlat
         this.animate();
     }
     
     showCar(carId) {
         if (!this.initialized || !this.scene) {
-            setTimeout(() => this.showCar(carId), 100);
+            console.log('Sahne hazır değil, bekleniyor...');
+            setTimeout(() => this.showCar(carId), 200);
             return;
         }
         
         // Eski arabayı kaldır
         if (this.carMesh) {
             this.scene.remove(this.carMesh);
+            if (this.carMesh.traverse) {
+                this.carMesh.traverse((child) => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(m => m.dispose());
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                });
+            }
             this.carMesh = null;
         }
         
         const carData = CAR_MODELS[carId];
-        if (!carData) return;
+        if (!carData) {
+            console.error('Araç verisi bulunamadı:', carId);
+            return;
+        }
         
-        console.log('Araç yükleniyor:', carData.name);
+        console.log('Araç yükleniyor:', carData.name, carData.modelUrl);
         
-        // Prosedürel model göster
+        // Önce prosedürel model göster (hızlı)
         this.carMesh = createCarMesh(carData);
         this.carMesh.position.set(0, 0, 0);
+        this.carMesh.rotation.y = 0;
         this.scene.add(this.carMesh);
         
-        // GLB varsa yükle
+        // GLB model varsa yükle
         if (carData.modelUrl) {
             loadGLBModel(carData.modelUrl, carData, (model) => {
-                if (this.carMesh) this.scene.remove(this.carMesh);
+                // Eski modeli kaldır
+                if (this.carMesh) {
+                    this.scene.remove(this.carMesh);
+                }
+                
                 this.carMesh = model;
                 this.carMesh.position.set(0, 0, 0);
+                this.carMesh.rotation.y = 0;
                 this.scene.add(this.carMesh);
-                console.log('GLB yüklendi:', carData.name);
+                
+                console.log('GLB model yüklendi:', carData.name);
             });
         }
     }
     
     animate() {
+        if (!this.initialized) return;
+        
         this.animationId = requestAnimationFrame(() => this.animate());
         
-        if (this.carMesh) {
-            this.carMesh.rotation.y += 0.008;
+        // Araba döndür
+        if (this.carMesh && this.isVisible) {
+            this.carMesh.rotation.y += this.rotationSpeed;
         }
         
-        if (this.renderer && this.scene && this.camera) {
+        // Render
+        if (this.renderer && this.scene && this.camera && this.isVisible) {
             this.renderer.render(this.scene, this.camera);
         }
     }
     
     show() {
-        if (this.canvas) this.canvas.style.display = 'block';
+        if (this.canvas) {
+            this.canvas.style.display = 'block';
+            this.isVisible = true;
+        }
     }
     
     hide() {
-        if (this.canvas) this.canvas.style.display = 'none';
+        if (this.canvas) {
+            this.canvas.style.display = 'none';
+            this.isVisible = false;
+        }
+    }
+    
+    onWindowResize() {
+        if (!this.camera || !this.renderer || !this.canvas) return;
+        
+        const width = window.innerWidth * 0.6;
+        const height = window.innerHeight;
+        
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(width, height);
     }
     
     destroy() {
-        if (this.animationId) cancelAnimationFrame(this.animationId);
+        this.isVisible = false;
+        
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        
         if (this.canvas && this.canvas.parentNode) {
             this.canvas.parentNode.removeChild(this.canvas);
         }
+        
+        if (this.renderer) {
+            this.renderer.dispose();
+        }
+        
         this.initialized = false;
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.carMesh = null;
+        this.canvas = null;
     }
 }
 
@@ -421,7 +545,7 @@ let garagePreview = null;
 
 // Pencere yeniden boyutlandırma
 window.addEventListener('resize', () => {
-    if (garagePreview) {
+    if (garagePreview && garagePreview.onWindowResize) {
         garagePreview.onWindowResize();
     }
 });

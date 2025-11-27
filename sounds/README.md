@@ -27,7 +27,7 @@ Aşağıdaki ses dosyalarını bu klasöre ekleyin:
 | `crash.mp3` | Çarpışma sesi | 0.5-1 saniye | MP3/OGG |
 | `tire_screech.mp3` | Lastik gıcırtısı (drift) | 1-2 saniye | MP3/OGG |
 | `nitro_boost.mp3` | Nitro aktivasyon sesi | 1-2 saniye | MP3/OGG |
-| `fuel_pump.mp3` | Yakıt doldurma sesi | 2-3 saniye | MP3/OGG |
+| `fuel_pump.mp3` | Yakıt doldurm   a sesi | 2-3 saniye | MP3/OGG |
 
 ---
 

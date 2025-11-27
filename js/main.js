@@ -46,6 +46,8 @@ function updateStatsScreen() {
 
 // Garaj başlatma
 function initGarage() {
+    console.log('Garaj başlatılıyor...');
+    
     // Sahip olunan araçları yükle
     ownedCars = JSON.parse(localStorage.getItem('ownedCars')) || [0];
     
@@ -54,19 +56,27 @@ function initGarage() {
     const garageMoney = document.getElementById('garageMoney');
     if (garageMoney) garageMoney.textContent = money.toLocaleString();
     
+    // Garaj önizleme oluştur veya yeniden başlat
     if (!garagePreview) {
         garagePreview = new GaragePreview();
-        garagePreview.init('carPreview');
     }
     
-    // Biraz bekle - canvas oluşsun, sonra göster
+    // Sahneyi başlat
+    garagePreview.init('carPreview');
+    
+    // Canvas'ı göster ve arabayı yükle
     setTimeout(() => {
-        if (garagePreview && garagePreview.show) {
+        if (garagePreview) {
             garagePreview.show();
+            console.log('Garaj canvas gösterildi');
+            
+            // İndikatörleri güncelle
+            updateCarIndicators();
+            
+            // Seçili arabayı göster
+            selectCar(selectedCarId);
         }
-        updateCarIndicators();
-        selectCar(selectedCarId);
-    }, 300);
+    }, 100);
 }
 
 // Önceki araba
