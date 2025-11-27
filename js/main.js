@@ -346,6 +346,11 @@ function initGame() {
     // Harita oluştur
     gameMap = new GameMap(scene, physicsWorld);
     
+    // Tuning sistemi - oyuncu oluşturulmadan önce
+    if (!tuningSystem) {
+        tuningSystem = new TuningSystem();
+    }
+    
     // Oyuncu oluştur
     const carData = CAR_MODELS[selectedCarId];
     player = new Player(scene, physicsWorld, carData);

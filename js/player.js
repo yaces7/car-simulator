@@ -7,7 +7,14 @@ class Player {
     constructor(scene, physicsWorld, carData, spawnPosition = { x: 5, y: 1, z: 50 }) {
         this.scene = scene;
         this.physicsWorld = physicsWorld;
-        this.carData = carData;
+        
+        // Tuning bonuslarını uygula
+        if (typeof tuningSystem !== 'undefined' && tuningSystem) {
+            this.carData = { ...carData, stats: tuningSystem.applyUpgrades({ ...carData.stats }) };
+            console.log('Tuning bonusları uygulandı:', this.carData.stats);
+        } else {
+            this.carData = carData;
+        }
         
         // Mesh oluştur
         this.mesh = createCarMesh(carData);

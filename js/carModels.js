@@ -273,21 +273,30 @@ class GaragePreview {
     }
     
     init(containerId) {
+        this.containerId = containerId;
         const container = document.getElementById(containerId);
-        if (!container) return;
+        if (!container) {
+            console.error('Garaj container bulunamadı:', containerId);
+            return;
+        }
         
         // Container'ı temizle
         container.innerHTML = '';
         
+        // Container boyutlarını al
+        const rect = container.getBoundingClientRect();
+        const width = rect.width || window.innerWidth * 0.6;
+        const height = rect.height || window.innerHeight;
+        
         // Sahne
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x1e3c72);
-        this.scene.fog = new THREE.Fog(0x1e3c72, 10, 50);
+        this.scene.background = new THREE.Color(0x1a1a2e);
+        this.scene.fog = new THREE.Fog(0x1a1a2e, 15, 60);
         
         // Kamera
         this.camera = new THREE.PerspectiveCamera(
             45,
-            window.innerWidth / window.innerHeight,
+            width / height,
             0.1,
             1000
         );
@@ -295,11 +304,12 @@ class GaragePreview {
         this.camera.lookAt(0, 0, 0);
         
         // Renderer
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setSize(width, height);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.setClearColor(0x1a1a2e, 1);
         
         // Canvas stilini ayarla
         this.renderer.domElement.style.position = 'absolute';
@@ -309,6 +319,8 @@ class GaragePreview {
         this.renderer.domElement.style.height = '100%';
         
         container.appendChild(this.renderer.domElement);
+        
+        console.log('Garaj renderer oluşturuldu:', width, 'x', height);
         
         // Işıklar
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -355,17 +367,21 @@ class GaragePreview {
         // Yeni araba
         const carData = CAR_MODELS[carId];
         
+        console.log('Araç yükleniyor:', carData.name, carData.modelUrl);
+        
         // GLB model varsa yükle, yoksa prosedürel oluştur
         if (carData.modelUrl) {
             loadGLBModel(carData.modelUrl, carData, (model) => {
                 this.carMesh = model;
                 this.carMesh.position.set(0, 0, 0);
                 this.scene.add(this.carMesh);
+                console.log('GLB model yüklendi:', carData.name);
             });
         } else {
             this.carMesh = createCarMesh(carData);
             this.carMesh.position.set(0, 0, 0);
             this.scene.add(this.carMesh);
+            console.log('Prosedürel model oluşturuldu:', carData.name);
         }
     }
     
